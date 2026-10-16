@@ -1,11 +1,8 @@
 //! Text to positioned quads.
 //!
-//! The output is in the space the C++ `Renderer2D::DrawString` built
-//! (`UHE/src/UHE/Renderer/Renderer2D.cpp:453-560`): x advances rightwards, y
-//! downwards, one line height is 1.0, and the origin of the first line is
-//! (0, 0) with the baseline on it. Nothing here is a second coordinate
-//! convention — the plane bounds and the UVs are the ones the atlas already
-//! carries, scaled and translated.
+//! x advances rightwards, y downwards, one line height is 1.0, and the origin of
+//! the first line is (0, 0) with the baseline on it. The plane bounds and the UVs
+//! are the ones the atlas already carries, scaled and translated.
 
 use glam::Vec2;
 
@@ -21,9 +18,9 @@ pub enum Align {
 
 #[derive(Clone, Copy, Debug)]
 pub struct LayoutOptions {
-    /// Extra space after every glyph, in layout units. The C++ `Kerning`
-    /// (`Components.h:74`), which is per-glyph tracking rather than a pair
-    /// adjustment — the pair table is applied separately, before the glyph.
+    /// Extra space after every glyph, in layout units. Per-glyph tracking rather
+    /// than a pair adjustment; the pair table is applied separately, before the
+    /// glyph.
     pub kerning: f32,
     /// Extra distance between lines, on top of one line height.
     pub line_spacing: f32,
@@ -44,8 +41,8 @@ impl Default for LayoutOptions {
 }
 
 /// One glyph's quad: bottom-left, bottom-right, top-right, top-left, and the
-/// matching atlas coordinates. The order is the C++ one, because the index
-/// buffer and the winding follow from it.
+/// matching atlas coordinates. The order is fixed because the index buffer and
+/// the winding follow from it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextQuad {
     pub positions: [Vec2; 4],

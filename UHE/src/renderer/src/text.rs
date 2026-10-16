@@ -1,11 +1,8 @@
 //! The text component's draw data.
 //!
 //! A `meats::Text` becomes one text run: every glyph of one atlas in one vertex
-//! buffer, flushed into a single `draw_indexed`. The C++ issued one quad per
-//! glyph through the same batch but re-resolved the texture slot inside the
-//! character loop (`UHE/src/UHE/Renderer/Renderer2D.cpp:489-517`), which is a
-//! per-glyph dependency on batch state that only ends up correct by accident.
-//! Here the atlas is a parameter, so a run cannot sample the wrong one.
+//! buffer, flushed into a single `draw_indexed`. The atlas is a parameter, so a
+//! run cannot sample the wrong one.
 //!
 //! Coordinates are `font::layout`'s, unmodified: this applies the entity's
 //! `Mat4` and nothing else.
@@ -27,8 +24,8 @@ use crate::font::{Atlas, Layout};
 
 pub const TEXT_WGSL: &str = include_str!("../assets/shaders/text.wgsl");
 
-/// `TextVertex` (`Renderer2D.cpp:26-33`) without `TexIndex` and `EntityID`, for
-/// the reasons on [`crate::batch2d::SpriteVertex`].
+/// One text vertex, without a texture index or entity id, for the reasons on
+/// [`crate::batch2d::SpriteVertex`].
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct TextVertex {
@@ -69,8 +66,8 @@ impl TextRenderer {
     }
 
     /// Lay out `component` and append it. `atlas` and `texture` are the font the
-    /// caller resolved from `component.font` — the component names an asset, not
-    /// a GPU object, and resolving that is the font cache's job.
+    /// caller resolved from `component.font`: the component names an asset, not a
+    /// GPU object, and resolving that is the font cache's job.
     pub fn push(
         &mut self,
         component: &meats::Text,
@@ -185,8 +182,8 @@ impl TextRenderer {
     }
 
     /// The run a string belongs to. A different atlas starts the next one, which
-    /// is what keeps `runs` complete after every `push` — see
-    /// [`crate::batch2d::Batch2D`] for why that matters to the pass.
+    /// keeps `runs` complete after every `push`; see [`crate::batch2d::Batch2D`]
+    /// for why that matters to the pass.
     fn open_run(&mut self, texture: Texture) {
         if self.open && self.texture == Some(texture) {
             return;
@@ -258,9 +255,8 @@ pub fn create_buffers(
 }
 
 /// What the text shader's uniform buffer holds. `atlas` is
-/// `(width, height, distance range, mode)`: the first three are what the C++
-/// hardcoded (`assets/shaders/Text.slang`), the fourth tells the shader whether
-/// to reconstruct a distance field or read plain coverage.
+/// `(width, height, distance range, mode)`: the fourth tells the shader whether to
+/// reconstruct a distance field or read plain coverage.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct TextGlobals {

@@ -1,15 +1,11 @@
 //! The depth prepass, and the shadow map it produces.
 //!
-//! The C++ has no prepass and no shadow map: `Renderer3D` draws straight into
-//! the editor's colour and depth targets, and `SSAO` is an empty placeholder
-//! (`SSAO.cpp:7` is `void SSAO::init() {}`). This is the pass the renderer needs
-//! for both: a depth-only draw of every shadow-casting mesh, from whichever
-//! matrix the caller gives it. The camera's own depth prepass is the same pass
-//! with the camera's matrix, so there is one implementation, not two.
+//! A depth-only draw of every shadow-casting mesh, from whichever matrix the
+//! caller gives it; the camera's own depth prepass is the same pass with the
+//! camera's matrix, so there is one implementation, not two.
 //!
 //! A depth-only pipeline has one stage: `ShaderSet::fragment_for` returns `None`
-//! for it, which is what Vulkan wants and what the C++ would have had to spell
-//! out with two shader modules.
+//! for it.
 
 use chassis::{BindGroup, CommandList, PassScope, Pipeline};
 

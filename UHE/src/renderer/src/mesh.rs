@@ -1,8 +1,7 @@
 //! Meshes on the GPU, and the cache that owns them.
 //!
-//! Port of the geometry half of `UHE/Renderer3D/LoadModel.{h,cpp}` and
-//! `LoadModelUpload.cpp`: one vertex buffer and one index buffer per mesh,
-//! uploaded once and shared by every entity that instances it.
+//! One vertex buffer and one index buffer per mesh, uploaded once and shared by
+//! every entity that instances it.
 
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -15,15 +14,13 @@ use chassis::{
 };
 use vault::AssetId;
 
-/// One vertex, interleaved. Position, normal, UV, tangent and colour, in the
-/// order the C++ `RD3d::Vertex` declares them.
+/// One vertex, interleaved. Position, normal, UV, tangent and colour.
 ///
-/// The C++ vertex also carries `JOINTS_0`/`WEIGHTS_0`, and `vault::MeshData`
-/// has them. They are not here yet because nothing skins: the palette comes from
-/// `bifrost::animation`, whose clip-to-`Animator` glue from a loaded model is
-/// not in place, so an attribute nothing reads would be stride paid for by every
-/// vertex in every mesh. Adding the two is a change to this struct, the layout
-/// below and the shader — and `MeshKey` keys on the layout, so the mesh cache
+/// `JOINTS_0`/`WEIGHTS_0` are not here yet because nothing skins: the palette
+/// comes from `bifrost::animation`, whose clip-to-`Animator` glue from a loaded
+/// model is not in place, so an attribute nothing reads would be stride paid for
+/// by every vertex in every mesh. Adding the two is a change to this struct, the
+/// layout below and the shader; `MeshKey` keys on the layout, so the mesh cache
 /// re-uploads by itself when it happens.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
@@ -33,10 +30,8 @@ pub struct Vertex {
     pub uv: [f32; 2],
     /// `xyz` tangent, `w` handedness, as glTF's TANGENT accessor stores it.
     pub tangent: [f32; 4],
-    /// `COLOR_0`, white when the mesh has none. The shader multiplies it into
-    /// the base colour unconditionally, which is why an absent `COLOR_0` needs no
-    /// flag: the C++'s `hasVertexColor` exists to gate a gamma decode the loader
-    /// does on the CPU, and there is no decode here.
+    /// `COLOR_0`, white when the mesh has none. The shader multiplies it into the
+    /// base colour unconditionally, so an absent `COLOR_0` needs no flag.
     pub color: [f32; 4],
 }
 
@@ -72,8 +67,7 @@ pub fn vertex_layout() -> VertexLayout {
                 format: TextureFormat::Rgba32Float,
                 offset: std::mem::offset_of!(Vertex, tangent) as u32,
             },
-            // Location 6, the C++ `a_Color`, so the two vertex layouts can be
-            // read side by side.
+            // Location 6, matching the shader's colour attribute.
             VertexAttribute {
                 location: LOCATION_COLOR,
                 format: TextureFormat::Rgba32Float,
@@ -85,10 +79,9 @@ pub fn vertex_layout() -> VertexLayout {
 
 /// A layout, as a hashable cache key.
 ///
-/// `VertexLayout` is not `Hash`, and a cache key has to be: this is the same
-/// trick `DescriptorSetLayoutDesc::hash` uses, and for the same reason — the
-/// layout a mesh was uploaded with is what makes it reusable, so two meshes with
-/// the same layout share one buffer and two with different ones never do.
+/// `VertexLayout` is not `Hash`, and a cache key has to be: the layout a mesh was
+/// uploaded with is what makes it reusable, so two meshes with the same layout
+/// share one buffer, and two with different ones never do.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct VertexLayoutKey(u64);
 
@@ -133,9 +126,9 @@ pub struct GpuMesh {
 
 /// Interleaves the asset's parallel attribute arrays into vertices.
 ///
-/// Missing attributes take the C++ defaults rather than being dropped: a normal
-/// of +Z and a tangent of +X/right-handed, which is what `RD3d::Vertex` starts
-/// from and what makes a mesh with no normals shade rather than vanish.
+/// Missing attributes take defaults rather than being dropped: a normal of +Z and
+/// a tangent of +X/right-handed, which makes a mesh with no normals shade rather
+/// than vanish.
 pub fn interleave(data: &vault::MeshData) -> Vec<Vertex> {
     (0..data.positions.len())
         .map(|i| Vertex {
@@ -147,8 +140,8 @@ pub fn interleave(data: &vault::MeshData) -> Vec<Vertex> {
                 .get(i)
                 .copied()
                 .unwrap_or([1.0, 0.0, 0.0, 1.0]),
-            // White, the C++ default: a zero default would tint every mesh black
-            // and a gamma-decoded one would tint every mesh wrongly.
+            // White: a zero default would tint every mesh black and a
+            // gamma-decoded one would tint every mesh wrongly.
             color: data.colors.get(i).copied().unwrap_or([1.0; 4]),
         })
         .collect()
@@ -172,9 +165,8 @@ impl MeshCache {
 
     /// The resident mesh, or an upload of it.
     ///
-    /// The second call for a key returns the same handles as the first: that is
-    /// the whole point of the cache, and the C++ gets it by uploading geometry
-    /// once per glTF mesh rather than once per node that references it.
+    /// The second call for a key returns the same handles as the first: geometry
+    /// is uploaded once per glTF mesh, not once per node that references it.
     pub fn get_or_upload(
         &mut self,
         resources: &mut dyn Resources,

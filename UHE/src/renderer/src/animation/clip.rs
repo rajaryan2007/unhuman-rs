@@ -1,9 +1,8 @@
-//! Clip and skeleton data, ported from `Renderer3D/Animation.h`.
+//! Clip and skeleton data.
 //!
 //! A clip is a set of tracks (translation / rotation / scale), each a sorted list of
 //! keys with an interpolation mode. `set_keys` / `set_spline_keys` build a track from
-//! decoded accessor data, which is how `LoadModelAnimation.cpp::AppendTrackKeys` is
-//! ported: the glTF reading stays with the loader, the track construction is here.
+//! decoded accessor data; the glTF reading stays with the loader.
 
 use glam::{Mat4, Quat, Vec3};
 
@@ -41,7 +40,7 @@ impl<T> Keyframe<T> {
     }
 }
 
-/// Port of `VectorTrack` (`Animation.h`): positions or scales for one bone.
+/// Positions or scales for one bone.
 #[derive(Clone, Debug)]
 pub struct VectorTrack {
     pub target_bone: i32,
@@ -108,7 +107,7 @@ impl VectorTrack {
     }
 }
 
-/// Port of `QuaternionTrack` (`Animation.h`): orientations for one bone.
+/// Orientations for one bone.
 #[derive(Clone, Debug)]
 pub struct QuaternionTrack {
     pub target_bone: i32,
@@ -190,7 +189,7 @@ impl AnimationEvent {
     }
 }
 
-/// Port of `AnimationClip` (`Animation.h`).
+/// A named animation clip: position, rotation and scale tracks, plus events.
 #[derive(Clone, Debug)]
 pub struct Clip {
     pub name: String,
@@ -226,7 +225,7 @@ impl Clip {
 
     /// The track already targeting `target_bone`, or a new one. glTF may emit
     /// several channels for the same (bone, path) pair; merging them keeps the
-    /// sampled pose well defined. Port of `FindOrAddTrack`.
+    /// sampled pose well defined.
     pub fn position_track_mut(&mut self, target_bone: i32) -> &mut VectorTrack {
         match self
             .position_tracks
@@ -286,7 +285,7 @@ impl Clip {
     }
 }
 
-/// Port of `Bone` (`Animation.h`).
+/// One skeleton bone: its name, hierarchy ids and bind/local matrices.
 #[derive(Clone, Debug)]
 pub struct Bone {
     pub name: String,
@@ -308,7 +307,7 @@ impl Default for Bone {
     }
 }
 
-/// Port of `Skeleton` (`Animation.h`).
+/// A bone hierarchy with its joint list and root.
 #[derive(Clone, Debug)]
 pub struct Skeleton {
     pub bones: Vec<Bone>,
@@ -332,7 +331,7 @@ impl Skeleton {
     }
 }
 
-/// Port of `Skin` (`Animation.h`): a joint subset with parallel inverse binds.
+/// A joint subset with parallel inverse bind matrices.
 #[derive(Clone, Debug, Default)]
 pub struct Skin {
     pub name: String,
@@ -341,7 +340,7 @@ pub struct Skin {
     pub inverse_bind_matrices: Vec<Mat4>,
 }
 
-/// Sampled local pose of one bone. Port of `BonePose` (`Animation.h`).
+/// Sampled local pose of one bone.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BonePose {
     pub translation: Vec3,
@@ -363,7 +362,6 @@ impl Default for BonePose {
 }
 
 /// Per-bone pose table for one sampled moment of a clip, indexed by bone ID.
-/// Port of `AnimationPose` (`Animation.h`).
 #[derive(Clone, Debug, Default)]
 pub struct Pose {
     pub bones: Vec<BonePose>,

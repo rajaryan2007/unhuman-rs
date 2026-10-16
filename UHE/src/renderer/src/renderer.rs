@@ -1,26 +1,17 @@
 //! The renderer frontend: the frame, and everything the frame owns.
 //!
-//! Port of `UHE/Renderer3D/Renderer3D.cpp` — init, scene begin, submission —
-//! with the C++'s file-static `s_Data3D` replaced by fields on [`Bifrost`].
-//! The spine's failure table names that struct first: nothing could be
-//! constructed in isolation while it was a static, so `tests/scene` had to
-//! recompile engine sources to have a renderer at all.
+//! The frame's state lives in fields on [`Bifrost`], not a static, so a renderer
+//! can be constructed in isolation and `tests/scene` need not recompile engine
+//! sources to get one.
 //!
-//! ## What a frame does
-//!
-//! 1. Resolve the camera ([`ViewSource`]) or take the editor camera.
-//! 2. Declare the frame's passes into its own render graph — reads and writes
-//!    only, because the graph owns every barrier (`chassis::graph`).
-//! 3. Compile the graph, prepare the uniform sets and the draw list, and hand
-//!    the compiled frame plus one [`PassRecorder`] to the backend.
-//!
-//! ## Who runs the frame
-//!
-//! `chassis::Gpu::record_frame`: the renderer declares the frame, then hands the
-//! compiled graph, the slot table its textures were minted into, and one
-//! [`PassRecorder`] to the backend. Recording, submitting and presenting stay the
-//! backend's -- it owns the executor, the command lists and the swapchain, and a
-//! frontend that recorded its own frame would have to name a driver to do it.
+//! A frame resolves its camera ([`ViewSource`] or the editor camera), declares
+//! its passes into its own render graph (reads and writes only, because the
+//! graph owns every barrier), compiles the graph, prepares the uniform sets and
+//! the draw list, then hands the compiled graph, the slot table its textures
+//! were minted into, and one [`PassRecorder`] to the backend. Recording,
+//! submitting and presenting stay the backend's: it owns the executor, the
+//! command lists and the swapchain, and a frontend that recorded its own frame
+//! would have to name a driver to do it.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -47,9 +38,6 @@ use crate::passes::{
 };
 
 /// Where the frame's camera comes from.
-///
-/// The C++ has two `BeginScene` overloads — one taking the editor camera, one
-/// taking a scene camera plus its transform — and this is that choice as a value.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ViewSource {
     /// A scene camera entity: its `Camera` component's projection, and the
@@ -62,13 +50,11 @@ pub enum ViewSource {
 /// The shadow map's edge, in texels.
 pub const SHADOW_MAP_SIZE: u32 = 2048;
 
-/// Half the extent of the directional light's orthographic box, in world units.
-///
-/// The C++ has no shadow map, so this is the one number a shadow needs that
-/// nothing in the tree suggests.
+/// The directional light's orthographic half-extent, in world units. Nothing
+/// else in the tree suggests a value, so a shadow needs this number.
 pub const SHADOW_EXTENT: f32 = 40.0;
 
-/// The clear colour, which the C++'s editor theme supplies.
+/// The clear colour, taken from the editor theme.
 pub const CLEAR_COLOR: [f32; 4] = [0.1, 0.1, 0.12, 1.0];
 
 /// The frame's own textures, recreated when the extent changes.
@@ -88,8 +74,8 @@ struct FrameTextures {
 }
 
 impl FrameTextures {
-    /// Null handles, so a live set can be swapped out and destroyed. Same trick
-    /// as a graph slot with no resource behind it.
+    /// Null handles, so a live set can be swapped out and destroyed, the same
+    /// trick as a graph slot with no resource behind it.
     fn null() -> Self {
         Self {
             color: Texture::null(),
@@ -116,14 +102,14 @@ impl FrameTextures {
 
         let color = resources.create_texture(TextureDesc::new_2d(
             Extent::new(width, height),
-            // The C++ model pipeline's first colour format is `RGBA8_SRGB`.
+            // sRGB, to match the model pipeline's colour output.
             TextureFormat::Rgba8Srgb,
             TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED,
         ))?;
         let color_view = resources.create_image_view(&color)?;
 
-        // Depth32Float rather than the C++'s `D24_UNORM_S8`: SSAO samples the
-        // depth buffer, and a depth-stencil format is not sampleable on wgpu.
+        // Depth32Float: SSAO samples the depth buffer, and a depth-stencil
+        // format is not sampleable on wgpu.
         let depth = resources.create_texture(TextureDesc::new_2d(
             Extent::new(width, height),
             TextureFormat::Depth32Float,
@@ -220,10 +206,8 @@ pub struct Bifrost {
 impl Bifrost {
     /// Builds the renderer against a live device.
     ///
-    /// `assets` is taken because `Renderer3D::Init` loaded its shaders through
-    /// the file system (`Renderer3D.cpp:63-70`); here the sources are embedded
-    /// and compiled in process, and the registry is where a caller's meshes and
-    /// images come from.
+    /// `assets` is where a caller's meshes and images come from; the shader
+    /// sources are embedded and compiled in process.
     pub fn new(gpu: &mut dyn Gpu, assets: &mut vault::Assets) -> Result<Self, Error> {
         let _ = assets;
 
@@ -272,8 +256,7 @@ impl Bifrost {
             frame_index: 0,
         };
 
-        // The 1x1 textures a material with no map of a kind samples. Made once,
-        // as the C++ makes one `WhiteTexture` at `Init`.
+        // The 1x1 textures a material with no map of a kind samples, made once.
         bifrost.textures_by_asset.white(gpu.resources())?;
         bifrost.textures_by_asset.neutral_normal(gpu.resources())?;
 
@@ -293,7 +276,7 @@ impl Bifrost {
     ///
     /// The textures are replaced by the next `render`, which has the device;
     /// this is called from a window event, where there is not. A zero extent is
-    /// skipped rather than clamped, which is what `Framebuffer::Resize` does.
+    /// skipped rather than clamped.
     pub fn resize(&mut self, extent: Extent2d) {
         if extent.width == 0 || extent.height == 0 {
             return;
@@ -338,11 +321,8 @@ impl Bifrost {
         self.show_grid = show;
     }
 
-    /// Registers a material description under an asset id, so a
-    /// `MeshSample::material` resolves to it.
-    ///
-    /// The C++'s loader filled `RD3d::Material` outright; this is where that
-    /// result lands in the Rust split.
+    /// Registers a material description under an asset id for
+    /// `MeshSample::material` to resolve.
     pub fn set_material(&mut self, id: vault::AssetId, material: Material) {
         self.material_assets.insert(id, material);
     }
@@ -442,8 +422,7 @@ impl Bifrost {
 
     /// Advances an editor camera by one frame's input.
     ///
-    /// The C++ read `Input::` globals in `EditorCamera::OnUpdate`; this takes the
-    /// state, so a caller with a window owns the only copy of it.
+    /// The input is passed in, so a caller with a window owns the only copy of it.
     pub fn update_editor_camera(&self, camera: &mut EditorCamera, input: &CameraInput) {
         camera.update(input);
         camera.on_scroll(input.scroll.1);
@@ -465,8 +444,8 @@ impl Bifrost {
             .map(|swapchain| swapchain.extent())
             .unwrap_or(self.extent);
         if extent.width == 0 || extent.height == 0 {
-            // A minimised window. `Framebuffer::Resize` says the same: a zero
-            // extent is not a frame to draw, it is a frame to skip.
+            // A minimised window: a zero extent is not a frame to draw, it is a
+            // frame to skip.
             return Ok(());
         }
         if extent != self.extent {
@@ -485,7 +464,7 @@ impl Bifrost {
         let light_data = light::extract(scene);
         let shadow_matrix = shadow_view_projection(&light_data, camera_position);
 
-        // ── declare the frame ──────────────────────────────────────────────
+        // declare the frame
         let targets = self.declare_frame();
         self.targets = Some(targets);
 
@@ -494,7 +473,7 @@ impl Bifrost {
             .compile()
             .map_err(|errors| Error::InvalidDescriptor(describe(&errors)))?;
 
-        // ── prepare what the recorders read ───────────────────────────────
+        // prepare what the recorders read
         let resources = gpu.resources();
 
         let mut slots = SlotTable::default();
@@ -536,7 +515,7 @@ impl Bifrost {
             draws,
         )?;
 
-        // ── run it ────────────────────────────────────────────────────────
+        // run the frame
         self.frame_index += 1;
         // One trait object: the backend owns the command lists and may record the
         // passes on worker threads.
@@ -553,9 +532,7 @@ impl Bifrost {
 
         // Imports, not transients: these textures outlive the frame, and imports
         // are the graph's culling roots (`compiler::cull`). `Undefined` as the
-        // entry state is the C++ habit of `oldLayout = eUndefined`
-        // (`VulkanCommandBuffer.cpp:104,153`) and the state from which the first
-        // transition is free.
+        // entry state makes the first transition free.
         let scene_color =
             graph.import_texture("scene.color", ImageState::Undefined, ImageState::ShaderRead);
         let scene_depth = graph.import_texture(
@@ -583,12 +560,10 @@ impl Bifrost {
             .kind(chassis::graph::PassType::Graphics)
             .depth(shadow, 1.0);
 
-        // Opaque geometry, then the blended draws (`GeometryPass`) — and the
-        // clear, because it is this pass's first writer. A separate clear pass
-        // would be culled: `compiler::cull` keeps a pass only when a live pass
-        // reads what it produced, and a `LoadOp::Load` is not a read in that
-        // model, so a clear whose target the next pass overwrites looks dead.
-        // `Renderer3D` clears in the same pass it draws for the same reason.
+        // Opaque geometry, then the blended draws (`GeometryPass`). The clear
+        // belongs to this pass: a separate clear pass would be culled, because
+        // `compiler::cull` keeps a pass only when a live pass reads what it
+        // produced, and a `LoadOp::Load` is not a read there.
         graph
             .pass(passes::PASS_OPAQUE)
             .color(scene_color, CLEAR_COLOR)
@@ -652,8 +627,7 @@ impl Bifrost {
                 .meshes
                 .get(&MeshKey::new(sample.mesh, self.mesh_layout))
             else {
-                // Not uploaded: `ensure_mesh` has not seen it. The C++ skips a
-                // primitive with a null buffer for the same reason.
+                // Not uploaded: `ensure_mesh` has not seen it.
                 log::trace!("bifrost: mesh {:?} has no GPU buffers yet", sample.mesh);
                 continue;
             };
@@ -688,9 +662,8 @@ impl Bifrost {
         self.draw_arena
             .begin(resources, &passes::pipeline::draw_layout(), &blocks)?;
 
-        // Opaque first, then the blended draws back to front. The C++ draws in
-        // submission order and says a sorted pass is what transmission needs
-        // (`MaterialExtensions.h:29-36`).
+        // Opaque first, then the blended draws back to front, because
+        // transmission needs a sorted pass.
         pending.sort_by(|a, b| {
             a.variant
                 .blends()
@@ -785,7 +758,7 @@ impl Bifrost {
             )?;
             // Blended draws are left out: a transparent surface in a shadow map
             // writes the depth of its whole quad, not of the part the blend lets
-            // through, and the C++ has no shadow map that would say either way.
+            // through.
             let shadow_draws: Vec<PreparedDraw> = draws
                 .iter()
                 .copied()
@@ -967,7 +940,6 @@ fn resolve_view(
             let camera = reference.get::<meats::Camera>().ok_or_else(|| {
                 Error::InvalidDescriptor(format!("view entity {entity:?} has no Camera component"))
             })?;
-            // The C++ `BeginScene(camera, transform, lights)` overload:
             // `projection * inverse(transform)`.
             Ok((
                 camera.projection() * transform.inverse(),
@@ -979,10 +951,10 @@ fn resolve_view(
 
 /// A directional light's shadow matrix, in the camera's neighbourhood.
 ///
-/// The C++ has no shadow map, so there is nothing to port: this places an
-/// orthographic box on the camera and looks along the first directional light.
-/// With no directional light the identity is returned, and the fragment shader's
-/// out-of-range uv test then leaves every surface unshadowed.
+/// Places an orthographic box on the camera and looks along the first
+/// directional light. With no directional light the identity is returned, and
+/// the fragment shader's out-of-range uv test then leaves every surface
+/// unshadowed.
 fn shadow_view_projection(lights: &[LightData], camera_position: Vec3) -> Mat4 {
     let Some(light) = lights
         .iter()
@@ -1017,10 +989,9 @@ fn shadow_view_projection(lights: &[LightData], camera_position: Vec3) -> Mat4 {
 
 /// The id an editor picks with.
 ///
-/// The C++ casts the entity to an `int`, which is entt's low half: the slot
-/// index. `Entity::index` is the same half, and it is what identifies the live
-/// entity a pick buffer names. The persistent identity is the `Id` component's
-/// uuid, which a pick buffer has no use for.
+/// `Entity::index` identifies the live entity a pick buffer names; the
+/// persistent identity is the `Id` component's uuid, which a pick buffer has no
+/// use for.
 fn entity_id(entity: meats::Entity) -> i32 {
     entity.index() as i32
 }

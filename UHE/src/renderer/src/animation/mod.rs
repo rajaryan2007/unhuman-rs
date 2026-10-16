@@ -1,9 +1,9 @@
 //! Skeletal animation: clips, sampling, playback, blending and state control.
 //!
-//! `Animator` is the port of `Renderer3D/Animator.cpp` — playback, cross-fade,
-//! events and root motion. `sampler` holds the pose math it drives, `clip` the
-//! data, `compression` the keyframe reduction and `state_machine` the FSM, which
-//! returns the state change instead of reaching into an animator.
+//! `Animator` drives playback, cross-fade, events and root motion. `sampler` holds
+//! the pose math it drives, `clip` the data, `compression` the keyframe reduction
+//! and `state_machine` the FSM, which returns the state change instead of reaching
+//! into an animator.
 
 pub mod clip;
 pub mod compression;
@@ -25,9 +25,8 @@ pub use state_machine::{
 
 use glam::{Mat4, Vec3};
 
-/// Port of `Animator` (`Renderer3D/Animator.h`), minus the `Model` it used to own:
-/// the skeleton, skins and clips are handed over directly, so the runtime carries no
-/// asset or ECS dependency and the caller applies the result.
+/// Animation runtime over a skeleton, skins and clips handed over directly, so it
+/// carries no asset or ECS dependency and the caller applies the result.
 #[derive(Debug)]
 pub struct Animator {
     skeleton: Skeleton,
@@ -123,10 +122,9 @@ impl Animator {
         self.final_bone_matrices = vec![Mat4::IDENTITY; self.skeleton.joint_nodes.len()];
     }
 
-    // --- playback controls ---
+    // playback controls
 
-    /// Advances the play head and re-evaluates the pose for this frame. Port of
-    /// `Animator::UpdateAnimation`.
+    /// Advances the play head and re-evaluates the pose for this frame.
     pub fn update_animation(&mut self, dt: f32) {
         self.root_motion_delta = Vec3::ZERO;
 
@@ -270,8 +268,7 @@ impl Animator {
         }
     }
 
-    /// Resumes playback. Port of `Animator::Play`, which restarts a clip that
-    /// already ran to the end under `LoopMode::None`.
+    /// Resumes playback, restarting a clip that ran to the end under `LoopMode::None`.
     pub fn play(&mut self) {
         if self.current_clip == -1 {
             return;
@@ -377,7 +374,7 @@ impl Animator {
         self.traverse_skeleton_roots();
     }
 
-    // --- cross-fade blending ---
+    // cross-fade blending
 
     /// Stops the current clip and cross-fades into the named one over `duration`
     /// seconds. Returns false when no clip carries that name.
@@ -419,7 +416,7 @@ impl Animator {
         self.blend_weight
     }
 
-    // --- events ---
+    // events
 
     /// Events the last `update_animation` crossed. Handed over, not called back, so
     /// the runtime never re-enters gameplay code.
@@ -427,7 +424,7 @@ impl Animator {
         std::mem::take(&mut self.events)
     }
 
-    // --- root motion ---
+    // root motion
 
     pub fn set_root_motion_enabled(&mut self, enabled: bool) {
         self.root_motion_enabled = enabled;
@@ -441,7 +438,7 @@ impl Animator {
         self.root_motion_delta
     }
 
-    // --- skin selection ---
+    // skin selection
 
     pub fn set_skin(&mut self, index: i32) {
         if index < 0 || index as usize >= self.skins.len() {
@@ -475,7 +472,7 @@ impl Animator {
         self.current_clip
     }
 
-    // --- internals ---
+    // internals
 
     fn traverse_skeleton_roots(&mut self) {
         let roots: Vec<i32> = self

@@ -1,14 +1,13 @@
 //! Inverse kinematics.
 //!
-//! `solve_two_bone` is the port of `Renderer3D/IKSolver.cpp`: analytic, returns the
-//! two joint rotations that place a two-bone chain's end effector on a target.
-//! `solve_fabrik` is the position-space counterpart for chains of any length, with the
-//! iteration cap and tolerance the C++ solver had no place for. Both are pure: joint
-//! positions in, positions (or rotations) out.
+//! `solve_two_bone` is analytic: it returns the two joint rotations that place a
+//! two-bone chain's end effector on a target. `solve_fabrik` is the position-space
+//! counterpart for chains of any length, with a configurable iteration cap and
+//! tolerance. Both are pure: joint positions in, positions (or rotations) out.
 
 use glam::{Quat, Vec3};
 
-/// Output rotations of the analytic two-bone solve. Port of `TwoBoneIKResult`.
+/// Output rotations of the analytic two-bone solve.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TwoBoneIkResult {
     pub solved: bool,
@@ -31,7 +30,7 @@ pub struct FabrikResult {
     pub iterations: usize,
 }
 
-/// Analytic two-bone solve. Port of `IKSolver::SolveTwoBone`.
+/// Analytic two-bone solve.
 ///
 /// Out-of-reach targets are clamped to the reachable annulus `|l1 - l2| < d < l1 + l2`,
 /// so the hinge never degenerates; a zero-length bone or a target on the root joint
@@ -60,9 +59,9 @@ pub fn solve_two_bone(
         return result;
     }
 
-    // Keep the target inside the reachable annulus `|l1 - l2| < d < l1 + l2`, in
-    // `glm::clamp`'s `max(lo)` then `min(hi)` order: a very short lower bone can push
-    // the two bounds past each other, and `f32::clamp` would panic on that.
+    // Keep the target inside the reachable annulus `|l1 - l2| < d < l1 + l2`. A very
+    // short lower bone can push the two bounds past each other, and `f32::clamp`
+    // would panic on that, so clamp manually in `max(lo)` then `min(hi)` order.
     let max_reach = (upper_length + lower_length) * (1.0 - 1e-4);
     let min_reach = (upper_length - lower_length).abs() * (1.0 + 1e-4) + f32::EPSILON;
     let mut reach = target_distance;

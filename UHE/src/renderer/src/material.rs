@@ -1,22 +1,17 @@
 //! Materials: the CPU description, the GPU layout, and the caches.
 //!
-//! Port of `UHE/Renderer3D/MaterialGPU.{h,cpp}` and `MaterialExtensions.h`,
-//! with the two caches the C++ did not have: textures keyed by asset, and
-//! material bind groups keyed by a [`MaterialKey`].
+//! Two caches sit here: textures keyed by asset, and material bind groups keyed
+//! by a [`MaterialKey`].
 //!
-//! ## What is not ported, and why
+//! ## What is not carried, and why
 //!
-//! The C++ `MaterialGPU` is a 1120-byte record whose texture table holds 19
-//! bindless slots, one per glTF extension map, and the shader indexes them
-//! through `u_Textures[10000]`. A descriptor *array* is not expressible in this
-//! RHI: `create_bind_group` takes images and samplers keyed by binding number
-//! with no array index, and `BindingDesc::count` has nothing to fill it from.
-//! So the ported pass binds the five maps it actually shades — albedo,
-//! metallic/roughness, normal, occlusion, emissive — as explicit bindings, and
-//! carries the two extension values those maps' shading depends on
-//! (`emissiveStrength`, `unlit`). The remaining Tier 2/3 factors (clearcoat,
-//! sheen, ior, transmission, iridescence, anisotropy, diffuse transmission,
-//! volume) have no shader to read them here and are not carried.
+//! A descriptor *array* is not expressible in this RHI: `create_bind_group` takes
+//! images and samplers keyed by binding number with no array index. So this pass
+//! binds the five maps it actually shades (albedo, metallic/roughness, normal,
+//! occlusion, emissive) as explicit bindings, and carries the two extension
+//! values those maps' shading depends on (`emissiveStrength`, `unlit`). The
+//! remaining Tier 2/3 factors (clearcoat, sheen, ior, transmission, iridescence,
+//! anisotropy, diffuse transmission, volume) have no shader to read them here.
 
 use std::collections::HashMap;
 
@@ -27,9 +22,8 @@ use chassis::{
 };
 use vault::AssetId;
 
-/// The material texture slots this pass samples, in the C++ `MaterialTextureSlot`
-/// order (`MaterialExtensions.h:64-86`): the numbers are the shader's slot
-/// indices, so they are kept even though only five of the nineteen are used.
+/// The material texture slots this pass samples. The numbers are the shader's
+/// slot indices, kept from a wider glTF slot table even though only five are used.
 pub const SLOT_ALBEDO: usize = 0;
 pub const SLOT_METALLIC_ROUGHNESS: usize = 1;
 pub const SLOT_NORMAL: usize = 2;
@@ -37,8 +31,7 @@ pub const SLOT_OCCLUSION: usize = 3;
 pub const SLOT_EMISSIVE: usize = 4;
 pub const SLOT_COUNT: usize = 5;
 
-/// glTF `alphaMode`, as `RD3d::AlphaMode`: the discriminator the shader reads
-/// out of `params.y`.
+/// glTF `alphaMode`: the discriminator the shader reads out of `params.y`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub enum AlphaMode {
     #[default]
@@ -59,10 +52,9 @@ impl AlphaMode {
 
 /// `KHR_texture_transform`, already in the engine's UV space.
 ///
-/// The loader flips V on import (the C++ does it in `LoadModelGeometry.cpp`), so
-/// the shader cannot apply glTF's raw offset/rotation on top; the values stored
-/// here are the engine-space ones, and the shader computes
-/// `uv' = R(rot) * (uv * scale) + offset`. Identity is `(1, 0, 1, 1, 0, 0)`.
+/// The loader flips V on import, so the shader cannot apply glTF's raw
+/// offset/rotation on top; the values stored here are engine-space, and the shader
+/// computes `uv' = R(rot) * (uv * scale) + offset`. Identity is `(1, 0, 1, 1, 0, 0)`.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct UVTransform {
     pub cos_rotation: f32,
@@ -88,10 +80,8 @@ impl Default for UVTransform {
 
 /// A material, as the loader hands it over.
 ///
-/// Fields and defaults mirror `RD3d::Material` (`LoadModel.h:88-138`). The
-/// defaults are the glTF spec's, not zero, and the C++ is emphatic about why: a
-/// zero `normalScale` silently disables every normal map, and a zero
-/// `occlusionStrength` every occlusion map.
+/// Defaults are the glTF spec's, not zero: a zero `normalScale` silently disables
+/// every normal map, and a zero `occlusionStrength` every occlusion map.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Material {
     pub albedo: Option<AssetId>,
@@ -116,7 +106,7 @@ pub struct Material {
     pub alpha: AlphaMode,
     /// 0.5, the spec default.
     pub alpha_cutoff: f32,
-    /// Selects the cull variant, as in the C++: cull mode is pipeline state.
+    /// Selects the cull variant; cull mode is pipeline state.
     pub double_sided: bool,
     /// `KHR_materials_unlit`: output base colour and shade nothing.
     pub unlit: bool,
@@ -164,10 +154,9 @@ impl Material {
 
 /// The material parameters, as the shader's uniform block reads them.
 ///
-/// Field order is the layout contract with `model.wgsl`; every member is a
-/// `vec4` so std140 and the shader's `uniform` layout cannot disagree, which is
-/// the same rule `MaterialGPU.h` states for its struct. `size_of` is asserted
-/// below rather than trusted.
+/// Field order is the layout contract with `model.wgsl`; every member is a `vec4`
+/// so std140 and the shader's `uniform` layout cannot disagree. `size_of` is
+/// asserted below rather than trusted.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct MaterialGpu {
@@ -186,8 +175,8 @@ pub struct MaterialGpu {
 
 const _: () = assert!(std::mem::size_of::<MaterialGpu>().is_multiple_of(16));
 
-/// Packs a material into the GPU layout. Port of `FillMaterialGPU`
-/// (`MaterialGPU.cpp:20-99`), for the slots and factors this pass shades.
+/// Packs a material into the GPU layout, for the slots and factors this pass
+/// shades.
 pub fn fill_gpu(material: &Material) -> MaterialGpu {
     let mut gpu = MaterialGpu::zeroed();
 
@@ -214,7 +203,7 @@ pub fn fill_gpu(material: &Material) -> MaterialGpu {
     for slot in 0..SLOT_COUNT {
         let transform = material.uv_transforms[slot];
         // Each slot carries its own transform, so KHR_texture_transform applies
-        // per map rather than per material, exactly as the C++ does it.
+        // per map rather than per material.
         gpu.uv_transform[slot] = [
             transform.cos_rotation,
             transform.sin_rotation,
@@ -229,9 +218,8 @@ pub fn fill_gpu(material: &Material) -> MaterialGpu {
 
 /// Which shader variant draws a material.
 ///
-/// The pipeline is where cull mode and blending live, so they are part of the
-/// key rather than state a draw can change: the C++ keeps two model pipelines
-/// for exactly this reason (`Renderer3D.cpp:78-95`).
+/// The pipeline is where cull mode and blending live, so they are part of the key
+/// rather than state a draw can change.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum MaterialVariant {
     /// Opaque, back-face culled.
@@ -290,9 +278,8 @@ impl MaterialTextures {
 /// shader reads.
 ///
 /// Floats are keyed by bit pattern, so two materials that differ in the last
-/// mantissa bit are two entries. That is the correct rule for a cache — an
-/// epsilon comparison would make the key depend on the caller's tolerance — and
-/// it costs one 224-byte buffer per distinct material.
+/// mantissa bit are two entries. That is the correct rule for a cache; an epsilon
+/// comparison would make the key depend on the caller's tolerance.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct MaterialKey {
     pub variant: MaterialVariant,
@@ -461,10 +448,8 @@ pub struct CachedTexture {
 
 /// Textures, keyed by asset.
 ///
-/// The C++ `Texture2D` owns its own sampler per texture (`Texture.h:26-38`, one
-/// `SamplerDesc` at creation); this keeps one shared sampler per filter mode,
-/// because the RHI's samplers are separate objects by design and every material
-/// map wants the same one.
+/// One shared sampler per filter mode, because the RHI's samplers are separate
+/// objects and every material map wants the same one.
 pub struct TextureCache {
     entries: HashMap<AssetId, CachedTexture>,
     linear: Option<Sampler>,
@@ -498,8 +483,7 @@ impl TextureCache {
         if let Some(sampler) = self.linear {
             return Ok(sampler);
         }
-        // Trilinear with repeat: glTF's default wrap is REPEAT, and the C++'s
-        // default sampler is linear/trilinear/repeat (`Texture.h:33-36`).
+        // Trilinear with repeat: glTF's default wrap is REPEAT.
         let sampler = resources.create_sampler(&SamplerDesc::trilinear())?;
         self.linear = Some(sampler);
         Ok(sampler)
@@ -507,9 +491,9 @@ impl TextureCache {
 
     /// The 1x1 texture a material with no map of a given kind samples: white.
     ///
-    /// Multiplying by white is the correct neutral for albedo, metallic/
-    /// roughness, occlusion and emissive — glTF says an absent map leaves the
-    /// factor in force, which is what sampling 1.0 does.
+    /// Multiplying by white is the correct neutral for albedo, metallic/roughness,
+    /// occlusion and emissive; glTF says an absent map leaves the factor in force,
+    /// which is what sampling 1.0 does.
     pub fn white(
         &mut self,
         resources: &mut dyn Resources,
@@ -530,10 +514,10 @@ impl TextureCache {
 
     /// The 1x1 texture an absent *normal* map samples: `(0.5, 0.5, 1)`.
     ///
-    /// Not white: `(1, 1, 1)` decodes to a tangent-space normal tilted 45° in
-    /// both axes, so binding white for a missing normal map tilts every normal
-    /// on that surface. Linear, because a normal map is data and not colour —
-    /// an sRGB view would decode `0.5` to `0.21`.
+    /// Not white: `(1, 1, 1)` decodes to a tangent-space normal tilted 45 degrees
+    /// in both axes, so binding white for a missing normal map tilts every normal
+    /// on that surface. Linear, because a normal map is data and not colour; an
+    /// sRGB view would decode `0.5` to `0.21`.
     pub fn neutral_normal(
         &mut self,
         resources: &mut dyn Resources,
@@ -581,9 +565,8 @@ impl TextureCache {
         // reads that field, so a texture created with it holds nothing on the
         // default backend. This is the path both backends implement.
         //
-        // Queued, not finished — the doc on `Resources::upload_texture` is
-        // explicit that destroying the texture before the copy drains is
-        // `VUID-vkDestroyImage-image-01000`, so teardown waits at frame end.
+        // Queued, not finished: destroying the texture before the copy drains is
+        // illegal, so teardown waits at frame end.
         resources.upload_texture(&texture, &image.rgba8, image.width, image.height)?;
         let view = resources.create_image_view(&texture)?;
         let sampler = self.sampler(resources)?;

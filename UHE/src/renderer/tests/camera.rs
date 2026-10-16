@@ -1,17 +1,16 @@
 //! The editor camera: its two matrices, and its three controls.
 //!
-//! Every expected number is computed by hand from `EditorCamera.cpp`'s formula
-//! and written out here, rather than by calling the code and recording what it
-//! said. The projection test asserts through `project_point3`, so it checks the
-//! property that matters — near plane at depth 0, far plane at depth 1, the
-//! field of view and the aspect ratio — instead of the eleven entries of a
-//! matrix whose sign convention is a library's business.
+//! Every expected number is computed by hand and written out here, not recorded
+//! from the code. The projection test asserts through `project_point3`, so it
+//! checks the properties that matter (near plane at depth 0, far plane at depth
+//! 1, field of view, aspect ratio) instead of a matrix's eleven entries, whose
+//! sign convention is the library's business.
 
 use bifrost::camera::{Camera, CameraInput};
 use bifrost::EditorCamera;
 use glam::{Mat4, Vec3};
 
-/// The C++ default viewport is 1280x720 and its default `new` takes 45 degrees.
+/// The default viewport is 1280x720 and a default camera takes 45 degrees.
 fn camera() -> EditorCamera {
     EditorCamera::new(45.0, 16.0 / 9.0, 0.1, 1000.0)
 }
@@ -51,8 +50,7 @@ fn a_fresh_camera_sits_on_plus_z_at_the_default_distance() {
     );
 }
 
-/// The projection is Vulkan's: right-handed, depth 0..1, which is what
-/// `GLM_FORCE_DEPTH_ZERO_TO_ONE` (`UHE/src/uhepch.h:5`) turns on in the C++.
+/// The projection is Vulkan's: right-handed, depth 0..1.
 #[test]
 fn the_projection_is_a_vulkan_perspective() {
     let camera = camera();
@@ -126,8 +124,8 @@ fn an_alt_left_drag_orbits_around_the_focal_point() {
 }
 
 /// Alt + middle-drag pans the focal point in the camera's own axes. The pan
-/// speed for a 1280x720 viewport is (0.13448144, 0.19305744) by the C++'s
-/// polynomial, and a 10x-20 pixel drag is `delta = (0.03, -0.06)`.
+/// speed for a 1280x720 viewport is (0.13448144, 0.19305744), and a 10x-20 pixel
+/// drag is `delta = (0.03, -0.06)`.
 #[test]
 fn an_alt_middle_drag_pans_the_focal_point() {
     let mut camera = camera();
@@ -160,7 +158,7 @@ fn scrolling_dollies_the_camera() {
 }
 
 /// The dolly clamp: below distance 1 the camera steps one unit towards the focal
-/// point instead of passing through it, which is the C++'s rule.
+/// point instead of passing through it.
 #[test]
 fn the_dolly_stops_at_distance_one() {
     let mut camera = camera();
@@ -173,8 +171,8 @@ fn the_dolly_stops_at_distance_one() {
     assert_near(camera.position(), Vec3::ZERO);
 }
 
-/// The base `Camera` is a projection matrix, and the C++
-/// `BeginScene(camera, transform)` overload turns one into a view-projection.
+/// The base `Camera` is a projection matrix; a view-projection is that matrix
+/// times the inverse of the transform.
 #[test]
 fn a_scene_camera_uses_the_inverse_of_its_transform() {
     let projection = glam::camera::rh::proj::directx::perspective(1.0, 1.0, 0.1, 100.0);

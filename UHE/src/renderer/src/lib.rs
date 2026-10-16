@@ -5,10 +5,10 @@
 //! speaks `chassis` and never names a driver, so both backends run the same
 //! renderer and the render graph stays the only owner of synchronization.
 //!
-//! Ownership: `Bifrost` holds every GPU resource it creates — meshes, materials,
-//! pipelines, the font atlas — and drops them through the RHI. The plugin owns
-//! `Bifrost`; `adam::Engine` never sees it, which is what keeps the engine free
-//! of a dependency on a renderer.
+//! Ownership: `Bifrost` holds every GPU resource it creates (meshes, materials,
+//! pipelines, the font atlas) and drops them through the RHI. The plugin owns
+//! `Bifrost`; `adam::Engine` never sees it, which keeps the engine free of a
+//! dependency on a renderer.
 
 pub mod animation;
 pub mod batch2d;

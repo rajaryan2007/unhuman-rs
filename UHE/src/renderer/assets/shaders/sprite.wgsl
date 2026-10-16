@@ -1,16 +1,14 @@
 // The 2D sprite batch draw. One texture per draw call, which is what the batch
-// guarantees (see `src/batch2d.rs`), so this samples one texture rather than the
-// C++ 32-slot descriptor array.
+// guarantees (see `src/batch2d.rs`), so this samples one texture rather than a
+// 32-slot descriptor array.
 //
 // ## Bindings
 //
 // Set 0, binding 0 is a `SampledImage` and binding 1 is a `Sampler` -- two
 // bindings, not one `CombinedImageSampler`, because wgpu cannot express a
-// combined descriptor at all (the root `assets/shaders/Textured.slang` carries
-// the same note for the same reason). Set 1, binding 0 is the view-projection
-// the C++ spelt as a push constant (`Renderer2D.cpp:29-33`); the RHI has no
-// push-constant range, so it is a uniform buffer, and separating it from set 0
-// is what lets a pass bind it once for every batch.
+// combined descriptor at all. Set 1, binding 0 is the view-projection; the RHI
+// has no push-constant range, so it is a uniform buffer, and separating it from
+// set 0 is what lets a pass bind it once for every batch.
 
 struct Globals {
     view_projection: mat4x4<f32>,

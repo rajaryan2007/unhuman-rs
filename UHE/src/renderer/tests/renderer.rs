@@ -27,13 +27,13 @@ use chassis::{
 };
 use vault::AssetId;
 
-// ── a recorded fake RHI ─────────────────────────────────────────────────────
+// ---- a recorded fake RHI ----
 
 /// A `Resources` that records what it was asked for.
 ///
 /// Handles are real generational handles from `chassis::Registry`, so a destroy
 /// bumps the generation exactly as a backend's would and a re-creation is
-/// observably a different handle — which is what the mesh-cache test asserts.
+/// observably a different handle, which is what the mesh-cache test asserts.
 #[derive(Default)]
 struct FakeResources {
     buffers: Registry<(), BufferTag>,
@@ -187,7 +187,7 @@ fn triangle() -> vault::MeshData {
     }
 }
 
-// ── the frame's graph ───────────────────────────────────────────────────────
+// ---- the frame's graph ----
 
 /// The frame's shape, compiled with no device: a depth prepass, the geometry,
 /// and the composition into an imported target.
@@ -288,9 +288,9 @@ fn a_cycle_is_refused_rather_than_ordered() {
     }
 }
 
-/// A pass cannot read and write one texture: the C++'s `PassStateConflict`, and
-/// the reason the grid and the gizmo lines are one pass here rather than two
-/// colour-writing passes.
+/// A pass cannot read and write one texture: `PassStateConflict`, and the reason
+/// the grid and the gizmo lines are one pass here rather than two colour-writing
+/// passes.
 #[test]
 fn a_pass_that_reads_what_it_writes_is_refused() {
     let mut graph = RenderGraph::new();
@@ -302,7 +302,7 @@ fn a_pass_that_reads_what_it_writes_is_refused() {
     assert_eq!(errors[0].kind, ErrorKind::PassStateConflict);
 }
 
-// ── pipelines ───────────────────────────────────────────────────────────────
+// ---- pipelines ----
 
 /// Every field that changes the pipeline is in the key, and the four model
 /// variants differ from one another.
@@ -468,7 +468,7 @@ fn the_pipeline_cache_creates_one_pipeline_per_key() {
     assert_eq!(cache.len(), 1);
 }
 
-// ── materials ───────────────────────────────────────────────────────────────
+// ---- materials ----
 
 /// A material key is the textures it binds and every value the shader reads, so
 /// two materials that differ anywhere are two entries.
@@ -666,7 +666,7 @@ fn destroying_a_texture_drops_every_material_that_bound_it() {
     );
 }
 
-// ── textures ────────────────────────────────────────────────────────────────
+// ---- textures ----
 
 /// A texture's bytes reach the GPU through `Resources::upload_texture`.
 ///
@@ -674,7 +674,7 @@ fn destroying_a_texture_drops_every_material_that_bound_it() {
 /// `TextureDesc::initial_data` instead: `stormglass` never reads that field, so
 /// the texture would have been created empty and every material would have
 /// sampled black on the default backend, with no error anywhere. Asserting on
-/// the call — its handle, its byte count and its extent — is what makes the
+/// the call (its handle, its byte count and its extent) is what makes the
 /// difference observable without a device.
 #[test]
 fn a_texture_upload_goes_through_upload_texture_with_the_image_bytes() {
@@ -748,7 +748,7 @@ fn the_neutral_maps_are_one_texel_and_the_normal_is_not_white() {
     assert_eq!(white.sampler, neutral.sampler);
 }
 
-// ── meshes ──────────────────────────────────────────────────────────────────
+// ---- meshes ----
 
 /// The same lookup twice is one upload, and a destroyed mesh is uploaded again
 /// rather than handed back as a stale handle.
@@ -801,8 +801,8 @@ fn a_mesh_key_includes_the_vertex_layout() {
     );
 }
 
-/// Interleaving fills a missing attribute with the C++ default rather than
-/// dropping the vertex, and an absent normal map's neutral is not white.
+/// Interleaving fills a missing attribute with a default rather than dropping
+/// the vertex, and an absent normal map's neutral is not white.
 #[test]
 fn interleaving_uses_the_defaults_for_absent_attributes() {
     let data = vault::MeshData {
@@ -816,7 +816,7 @@ fn interleaving_uses_the_defaults_for_absent_attributes() {
     assert_eq!(vertices[0].normal, [0.0, 1.0, 0.0]);
     assert_eq!(vertices[0].color, [1.0, 0.0, 0.0, 1.0]);
 
-    assert_eq!(vertices[1].normal, [0.0, 0.0, 1.0], "the C++ default");
+    assert_eq!(vertices[1].normal, [0.0, 0.0, 1.0], "the neutral normal");
     assert_eq!(vertices[1].uv, [0.0, 0.0]);
     assert_eq!(vertices[1].tangent, [1.0, 0.0, 0.0, 1.0]);
     assert_eq!(
@@ -834,7 +834,7 @@ fn interleaving_uses_the_defaults_for_absent_attributes() {
     );
 }
 
-// ── shaders ─────────────────────────────────────────────────────────────────
+// ---- shaders ----
 
 /// Every embedded shader parses, validates, and compiles to SPIR-V for each
 /// entry point it declares.
@@ -842,7 +842,7 @@ fn interleaving_uses_the_defaults_for_absent_attributes() {
 /// `forge::wgsl` validates with naga's validator, which is the same rule set
 /// wgpu enforces at shader-module creation, so a shader that passes here cannot
 /// fail on either backend for a *shader* reason. Running it means the renderer's
-/// six shaders are checked without a device — which is the point of compiling
+/// six shaders are checked without a device, which is the point of compiling
 /// WGSL in process instead of shelling out to Slang.
 #[test]
 fn every_embedded_shader_compiles_for_its_entry_points() {
@@ -893,7 +893,7 @@ fn every_embedded_shader_compiles_for_its_entry_points() {
     }
 }
 
-// ── the frame loop's one call ───────────────────────────────────────────────
+// ---- the frame loop's one call ----
 
 /// A `Gpu` that records what a frame handed it, with no device behind it.
 ///

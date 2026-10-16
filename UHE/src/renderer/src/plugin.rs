@@ -1,9 +1,8 @@
 //! The renderer as a plugin.
 //!
-//! `Engine` owns data and plugins own behavior (spine §1 rule 4), so `Bifrost`
-//! lives here and never in `adam::Engine`: that is what keeps `adam` free of a
-//! dependency on a renderer, and why the C++'s `s_Data3D` global has no
-//! successor.
+//! `Engine` owns data and plugins own behavior (spine section 1 rule 4), so
+//! `Bifrost` lives here and never in `adam::Engine`. That keeps `adam` free of a
+//! dependency on a renderer.
 //!
 //! `build` succeeds with `gpu: None`, because headless is the same binary with
 //! no device (rule 6) and a renderer that refuses to construct would make the
@@ -125,9 +124,8 @@ impl Plugin for BifrostPlugin {
         // camera state it was given rather than the previous frame's.
         self.camera.update(&self.input);
 
-        // Upload anything the frame will want. A hit after the first frame is a
-        // hash lookup; the C++ uploaded geometry once per glTF mesh at load time
-        // for the same reason.
+        // Upload anything the frame will want: a hit after the first frame is a
+        // hash lookup.
         for sample in eng.scene.meshes() {
             if let Err(error) = renderer.ensure_mesh(gpu.as_mut(), &eng.assets, sample.mesh) {
                 log::warn!("bifrost: mesh {:?} failed to upload: {error}", sample.mesh);
@@ -143,8 +141,7 @@ impl Plugin for BifrostPlugin {
             return;
         };
 
-        // The scene's primary camera if it has one, the editor camera otherwise:
-        // the C++ picks between the two `BeginScene` overloads the same way.
+        // The scene's primary camera if it has one, the editor camera otherwise.
         let view = match eng.scene.primary_camera() {
             Some(entity) => ViewSource::Scene(entity),
             None => ViewSource::Editor,

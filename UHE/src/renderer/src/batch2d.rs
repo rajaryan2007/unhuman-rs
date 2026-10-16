@@ -1,21 +1,14 @@
 //! The 2D sprite batch.
 //!
-//! One texture at a time. The C++ packed up to 32 textures into a descriptor
-//! array and flushed when the slots ran out (`UHE/src/UHE/Renderer/Renderer2D.cpp:60`),
-//! so which texture a vertex sampled was a *number in a lookup table* shared by
-//! the whole frame — and a batch could be drawn with the wrong table. Here a
-//! texture change starts the next draw, so a draw call binds exactly the texture
-//! its vertices were recorded against and there is no table to disagree with.
+//! One texture at a time. A texture change starts the next draw, so a draw call
+//! binds exactly the texture its vertices were recorded against.
 //!
-//! `batches` is complete after every `push_*`, not only after a `flush`: a
-//! caller that pushes and then asks what to draw sees all of it. `flush` ends
-//! the draw in progress, which is how a caller asks for two draws of one texture.
+//! `batches` is complete after every `push_*`, not only after a `flush`: a caller
+//! that pushes and then asks what to draw sees all of it. `flush` ends the draw in
+//! progress, which is how a caller asks for two draws of one texture.
 //!
-//! Vertex positions are built by transforming the C++ quad
-//! (`Renderer2D.cpp:399-402`) with the caller's `Mat4`; the index pattern is the
-//! C++ one (`Renderer2D.cpp:79-92`). They are the spec for the quad and its
-//! winding, and a second convention for either would be a second source of
-//! truth.
+//! Vertex positions transform the unit quad with the caller's `Mat4`; the index
+//! pattern fixes the quad's winding.
 
 use glam::{Mat4, Vec2, Vec3, Vec4};
 
@@ -38,10 +31,8 @@ const QUAD_POSITIONS: [[f32; 3]; 4] = [
 
 const QUAD_UV: [[f32; 2]; 4] = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
 
-/// `QuadVertex` (`Renderer2D.cpp:16-24`) without `TexIndex`: a batch holds one
-/// texture, so the index would be a constant 0 in every vertex — and without
-/// `EntityID`, which the C++ wrote to a second `R32_SINT` colour target that
-/// `chassis::TextureFormat` has no counterpart for.
+/// One sprite vertex. No texture index: a batch holds one texture, so it would be
+/// a constant 0. No entity id either; the RHI has no integer colour target for it.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SpriteVertex {
@@ -55,8 +46,7 @@ pub struct SpriteVertex {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DrawBatch {
     /// The texture bound for this draw. `None` is an untextured quad; the pass
-    /// binds a 1x1 white texel for it, which is what the C++ texture-slot 0 was
-    /// (`Renderer2D.cpp:30`, `127-131`).
+    /// binds a 1x1 white texel for it.
     pub texture: Option<Texture>,
     /// Indices, not bytes: `record` converts, because that is the one place the
     /// unit is decided.
@@ -64,7 +54,7 @@ pub struct DrawBatch {
     pub index_count: u32,
 }
 
-/// `Renderer2D::Statistics` (`Renderer2D.h:33-43`).
+/// Per-frame draw counts.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Statistics {
     pub draw_calls: u32,
@@ -81,8 +71,7 @@ impl Statistics {
     }
 }
 
-/// `translate(position) * scale(size)`, the transform the C++
-/// position/size overloads built (`Renderer2D.cpp:376-379`).
+/// `translate(position) * scale(size)`, the transform a position/size quad uses.
 pub fn quad_transform(position: Vec3, size: Vec2) -> Mat4 {
     Mat4::from_translation(position) * Mat4::from_scale(Vec3::new(size.x, size.y, 1.0))
 }
@@ -112,8 +101,7 @@ impl Batch2D {
         }
     }
 
-    /// Start a frame. `Statistics` survives, as it did in the C++ where only
-    /// `ResetStats` cleared it.
+    /// Start a frame. `Statistics` survives until `reset_stats`.
     pub fn begin(&mut self) {
         self.vertices.clear();
         self.indices.clear();
@@ -144,13 +132,8 @@ impl Batch2D {
         self.push_sprite_uv(texture, transform, color, tiling_factor, QUAD_UV);
     }
 
-    /// The C++'s `SubTexture2D` overload (`Renderer2D.cpp:426-470`): the unit
-    /// quad carrying caller-supplied atlas coordinates, in the same
+    /// The unit quad carrying caller-supplied atlas coordinates, in the same
     /// bottom-left, bottom-right, top-right, top-left order as [`QUAD_UV`].
-    ///
-    /// `SubTexture2D` itself lives in `UHE/Renderer2D/`, which the C++ build
-    /// excludes (`WORK.md`), so what arrives here is the four corners rather
-    /// than that type — which is all the draw ever used.
     pub fn push_sprite_uv(
         &mut self,
         texture: Option<Texture>,
@@ -253,9 +236,9 @@ impl Batch2D {
     }
 
     /// The draw a quad belongs to. A texture change ends the last one and starts
-    /// another, which is what keeps `batches` complete at every point — a caller
-    /// that never calls `flush` still has every draw it pushed, and one that asks
-    /// for fewer draws can say so with `flush`.
+    /// another, which keeps `batches` complete at every point: a caller that never
+    /// calls `flush` still has every draw it pushed, and one that asks for fewer
+    /// draws can say so with `flush`.
     fn open_draw(&mut self, texture: Option<Texture>) {
         if self.open && self.texture == texture {
             return;
@@ -274,8 +257,7 @@ impl Batch2D {
 /// The texture and its sampler: set 0 of both 2D pipelines.
 ///
 /// Separate image and sampler bindings, not a combined one, because wgpu has no
-/// combined descriptor at all — the same constraint the root
-/// `assets/shaders/Textured.slang` documents at length.
+/// combined descriptor at all.
 pub fn texture_layout(label: &str) -> DescriptorSetLayoutDesc {
     let fragment = StageMask::of(ShaderStage::Fragment);
     DescriptorSetLayoutDesc::new(label)
@@ -433,8 +415,8 @@ impl QuadPipeline {
             set_layouts: vec![texture_layout.clone(), globals_layout.clone()],
             vertex: vertex_layout,
             index_format: Some(IndexFormat::U32),
-            // Culling off: the C++ pipeline set neither, and a 2D quad's winding
-            // is only meaningful once the view-projection is known.
+            // Culling off: a 2D quad's winding is only meaningful once the
+            // view-projection is known.
             primitive: PrimitiveState {
                 cull_mode: 0,
                 ..PrimitiveState::default()
@@ -508,10 +490,8 @@ impl QuadPipeline {
 
 /// Set 1: one uniform block, uploaded per frame.
 ///
-/// `shortcut: the buffer and its bind group are re-created on every upload,`
-/// `because Resources has no update-in-place call. One upload_buffer removes`
-/// `this; until then a frame costs one small allocation and a`
-/// `destroy_bind_group the Vulkan backend ignores.`
+/// NOTE: the buffer and its bind group are re-created on every upload, because
+/// `Resources` has no update-in-place call; a frame costs one small allocation.
 pub struct Globals {
     layout: DescriptorSetLayoutDesc,
     buffer: Option<Buffer>,
@@ -581,9 +561,8 @@ impl SpriteGlobals {
 
 /// A vertex and index buffer sized for the batch's current contents.
 ///
-/// `shortcut: a batch's buffers are created once per frame from its contents,`
-/// `because Resources has no update-in-place call. One upload_buffer removes`
-/// `this; until then a drawn batch costs one allocation per frame.`
+/// NOTE: re-created once per frame, because `Resources` has no update-in-place
+/// call; a drawn batch costs one allocation per frame.
 pub fn create_buffers(
     resources: &mut dyn Resources,
     batch: &Batch2D,

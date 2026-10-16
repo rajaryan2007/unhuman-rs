@@ -1,9 +1,6 @@
 //! Track sampling, pose blending and bone-matrix evaluation.
 //!
-//! Port of `Animator.cpp`'s sampling half (`SamplePosition` / `SampleRotation` /
-//! `SampleScale` / `Hermite` / `SampleClip` / `BlendPoses`) plus the hierarchy walk
-//! (`BuildChildLists` / `CalculateBoneTransform` / `ComputeFinalMatrices`), kept
-//! free of state so every function is a pure function of its inputs.
+//! Kept free of state, so every function is a pure function of its inputs.
 
 use glam::{Mat4, Quat, Vec3, Vec4};
 
@@ -13,7 +10,7 @@ use crate::animation::clip::{
 };
 
 /// Cubic Hermite basis on `[a, b]`, with `a`'s outgoing tangent and `b`'s incoming
-/// tangent. Layout follows `Animator::Hermite`.
+/// tangent.
 pub fn hermite_vec3(
     a: &Keyframe<Vec3>,
     b: &Keyframe<Vec3>,
@@ -250,7 +247,7 @@ pub fn blend_poses(from: &Pose, to: &Pose, weight: f32, out: &mut Pose) {
     }
 }
 
-/// Per bone, the bones that name it as parent. Port of `Animator::BuildChildLists`.
+/// Per bone, the bones that name it as parent.
 pub fn build_child_lists(skeleton: &Skeleton) -> Vec<Vec<i32>> {
     let mut children: Vec<Vec<i32>> = vec![Vec::new(); skeleton.bones.len()];
     for (i, bone) in skeleton.bones.iter().enumerate() {
@@ -263,8 +260,8 @@ pub fn build_child_lists(skeleton: &Skeleton) -> Vec<Vec<i32>> {
 }
 
 /// The rest pose: each bone's local transform decomposed into translation, rotation
-/// and scale. Matrices glam cannot decompose (a zero scale, for instance) leave the
-/// bone at identity, the same guard `glm::decompose` provided.
+/// and scale. Matrices that cannot be decomposed (a zero scale, for instance) leave
+/// the bone at identity.
 pub fn rest_pose(skeleton: &Skeleton) -> Pose {
     let mut pose = Pose::new(skeleton.bones.len());
     for (i, bone) in skeleton.bones.iter().enumerate() {
@@ -337,8 +334,7 @@ pub(crate) fn calculate_bone_transform(
     }
 }
 
-/// World transforms for every bone, from each root down. Port of
-/// `Animator::TraverseSkeletonRoots`.
+/// World transforms for every bone, from each root down.
 pub fn global_transforms(
     skeleton: &Skeleton,
     children: &[Vec<i32>],
@@ -363,8 +359,8 @@ pub fn global_transforms(
     }
 }
 
-/// Port of `Animator::ComputeFinalMatrices`: world transforms times the selected
-/// skin's inverse binds, falling back to the skeleton's own joint list.
+/// World transforms times the selected skin's inverse binds, falling back to the
+/// skeleton's own joint list.
 pub fn skin_matrices(
     skeleton: &Skeleton,
     globals: &[Mat4],

@@ -1,14 +1,12 @@
 // The model pass: PBR-ish metallic-roughness shading with directional, point
-// and spot lights, one shadow lookup, and the five maps the ported material
-// system binds.
+// and spot lights, one shadow lookup, and the five maps the material system
+// binds.
 //
-// Port of the geometry half of `UHE_EDITOR/assets/shaders/Basic3D.slang`. What
-// is not ported and why: Basic3D shades the Tier 2/3 glTF extensions out of a
-// 19-slot bindless material table, and `chassis::Resources::create_bind_group`
-// has no descriptor arrays, so the extensions that need extra maps (clearcoat,
-// sheen, iridescence, anisotropy, transmission, volume) have no way to reach a
-// shader here. `params.y` (`unlit`) and `emissive_factor_strength` are the two
-// extension values the maps below do use.
+// `chassis::Resources::create_bind_group` has no descriptor arrays, so the
+// Tier 2/3 glTF extensions that need extra maps (clearcoat, sheen, iridescence,
+// anisotropy, transmission, volume) have no way to reach a shader here.
+// `params.y` (`unlit`) and `emissive_factor_strength` are the two extension
+// values the maps below do use.
 
 struct Frame {
     view_projection: mat4x4<f32>,
@@ -69,7 +67,7 @@ struct VertexInput {
     @location(2) uv: vec2<f32>,
     // xyz tangent, w handedness.
     @location(3) tangent: vec4<f32>,
-    // COLOR_0. Location 6, the C++ `a_Color`.
+    // COLOR_0, at location 6.
     @location(6) color: vec4<f32>,
 };
 
@@ -89,9 +87,8 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     let world = draw.model * vec4<f32>(in.position, 1.0);
     out.world_position = world.xyz;
 
-    // The model matrix is a TRS with no shear (the C++ bakes node transforms the
-    // same way), so transforming by the matrix is correct and an
-    // inverse-transpose is not needed.
+    // The model matrix is a TRS with no shear, so transforming by the matrix is
+    // correct and an inverse-transpose is not needed.
     let normal = normalize((draw.model * vec4<f32>(in.normal, 0.0)).xyz);
     let tangent = normalize((draw.model * vec4<f32>(in.tangent.xyz, 0.0)).xyz);
     out.normal = normal;
@@ -168,8 +165,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let emissive_texel = textureSample(emissive_texture, material_sampler, slot_uv(4u, in.uv));
 
     // Multiplied unconditionally: an absent COLOR_0 is white on the CPU side
-    // (`mesh::interleave`), so this is a no-op for a mesh that has none, and the
-    // C++'s per-primitive `useVertexColor` flag has nothing left to gate.
+    // (`mesh::interleave`), so this is a no-op for a mesh that has none.
     let base = albedo_texel.rgb * material.base_color_factor.rgb * draw.tint.rgb * in.color.rgb;
     let alpha = albedo_texel.a * material.base_color_factor.a * draw.tint.a;
 
@@ -206,9 +202,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // 0.04 is glTF's fixed dielectric F0; Metals use their base colour.
     let f0 = mix(vec3<f32>(0.04), base, metallic);
 
-    // One shadow lookup, for the first directional light. The C++ has no shadow
-    // map at all, so there is nothing to be faithful to here beyond the usual
-    // depth comparison: the RHI has no compare sampler, so it is done by hand.
+    // One shadow lookup, for the first directional light. The RHI has no compare
+    // sampler, so the depth comparison is done by hand.
     let shadow_clip = frame.shadow_view_projection * vec4<f32>(in.world_position, 1.0);
     let shadow_uv = vec2<f32>(
         shadow_clip.x / shadow_clip.w * 0.5 + 0.5,

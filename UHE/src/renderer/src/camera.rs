@@ -1,18 +1,14 @@
-//! Cameras: the base camera `Renderer3D::BeginScene` takes, and the editor's
-//! orbit camera.
+//! Cameras: the base scene camera, and the editor's orbit camera.
 //!
-//! Port of `UHE/Renderer/Camera.h` and `UHE/Renderer/EditorCamera.{h,cpp}`.
-//! Where the C++ read `Input::IsKeyPressed` and a desktop cursor out of a
-//! global (`EditorCamera.cpp:74-90`), the controls take a [`CameraInput`]
-//! snapshot per update: the same numbers, with the ambient access removed.
+//! The controls take a [`CameraInput`] snapshot per update rather than reading a
+//! global input state: the same numbers, with the ambient access removed.
 
 use glam::{Mat4, Quat, Vec2, Vec3};
 
 /// A projection matrix, and nothing else.
 ///
-/// Port of `Renderer/Camera.h`, which is a class holding `m_Projection` so that
-/// `Renderer3D::BeginScene(const Camera&, const glm::mat4&, lights)` can take a
-/// scene camera without knowing how it was configured.
+/// Lets a scene camera be passed by projection without knowing how it was
+/// configured.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Camera {
     projection: Mat4,
@@ -48,7 +44,7 @@ impl Default for Camera {
 /// controls must be drivable from a test with no window.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct CameraInput {
-    /// `KeyCode::LeftAlt`, which gates every other control, as in the C++.
+    /// Held Alt gates every other control.
     pub alt: bool,
     pub left: bool,
     pub middle: bool,
@@ -61,8 +57,8 @@ pub struct CameraInput {
 
 /// Orbit camera: pan, rotate and dolly about a focal point.
 ///
-/// The state and the arithmetic are the C++'s, including the two tuning
-/// polynomials in [`EditorCamera::pan_speed`] and the dolly clamp at distance 1.
+/// Tuned with the two polynomials in [`EditorCamera::pan_speed`] and a dolly
+/// clamp at distance 1.
 #[derive(Clone, Copy, Debug)]
 pub struct EditorCamera {
     fov: f32,
@@ -85,8 +81,7 @@ pub struct EditorCamera {
 }
 
 impl EditorCamera {
-    /// The C++ `EditorCamera(float, float, float, float)` constructor, which
-    /// recalculates the projection and the view. Field defaults are the C++'s.
+    /// Recalculates the projection and the view.
     pub fn new(fov: f32, aspect_ratio: f32, near_clip: f32, far_clip: f32) -> Self {
         let mut camera = Self {
             fov,
@@ -159,9 +154,9 @@ impl EditorCamera {
     }
 
     pub fn orientation(&self) -> Quat {
-        // glm's `quat(vec3 euler)` is `Rz(z) * Ry(y) * Rx(x)`, and the C++ passes
-        // `(-pitch, -yaw, 0)`. Spelled as the product rather than through an
-        // Euler order so the convention is not left to a library default.
+        // Spelled as the yaw-times-pitch product, with `(-pitch, -yaw, 0)`,
+        // rather than through an Euler order, so the convention is not left to a
+        // library default.
         Quat::from_rotation_y(-self.yaw) * Quat::from_rotation_x(-self.pitch)
     }
 
@@ -208,7 +203,7 @@ impl EditorCamera {
         self.update_view();
     }
 
-    /// The C++ `OnMouseScroll`, which zooms by a tenth of the offset.
+    /// Zooms by a tenth of the scroll offset.
     pub fn on_scroll(&mut self, dy: f32) {
         self.mouse_zoom(dy * 0.1);
         self.update_view();
@@ -245,8 +240,7 @@ impl EditorCamera {
 
     fn update_projection(&mut self) {
         self.aspect_ratio = self.viewport_width / self.viewport_height;
-        // `glm::perspective` under `GLM_FORCE_DEPTH_ZERO_TO_ONE`, which
-        // `UHE/src/uhepch.h:5` defines: right-handed, depth 0..1.
+        // Right-handed, depth 0..1.
         self.projection = glam::camera::rh::proj::directx::perspective(
             self.fov.to_radians(),
             self.aspect_ratio,
@@ -263,8 +257,7 @@ impl EditorCamera {
 
     /// Pan speed per axis, from the viewport size.
     ///
-    /// The C++ polynomial, kept because the feel of the editor came from it:
-    /// panning has to slow down in a small viewport and saturate in a large one.
+    /// Pan has to slow down in a small viewport and saturate in a large one.
     fn pan_speed(&self) -> (f32, f32) {
         let x = (self.viewport_width / 1000.0).min(2.4);
         let x_factor = 0.0366 * (x * x) - 0.1778 * x + 0.3021;
@@ -286,9 +279,8 @@ impl EditorCamera {
 }
 
 impl Default for EditorCamera {
-    /// The C++ default constructor: no projection, no view. `new` is what
-    /// calculates them, and a default camera is one nothing has looked through
-    /// yet rather than one with a made-up matrix.
+    /// No projection, no view; `new` calculates them. A default camera is one
+    /// nothing has looked through yet, not one with a made-up matrix.
     fn default() -> Self {
         Self {
             fov: 45.0,

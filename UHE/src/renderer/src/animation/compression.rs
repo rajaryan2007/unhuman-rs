@@ -1,16 +1,16 @@
-//! Keyframe reduction, ported from `Renderer3D/AnimationCompression.cpp` (CPU path).
+//! Keyframe reduction.
 //!
 //! A greedy linear reduction: an interior key is dropped when the straight blend
-//! between the last kept key and the next original key stays within tolerance at
-//! every original sample time, so the reduced track never deviates by more than the
-//! configured tolerance where the original had a key. Step tracks are preserved
-//! verbatim — their semantics change if interior keys go.
+//! between the last kept key and the next source key stays within tolerance at
+//! every source sample time, so the reduced track never deviates by more than the
+//! configured tolerance. Step tracks are preserved; their semantics change if
+//! interior keys go.
 
 use glam::{Quat, Vec3};
 
 use crate::animation::clip::{Clip, Interpolation, Keyframe, QuaternionTrack, VectorTrack};
 
-/// Error tolerances. Port of `CompressSettings`.
+/// Error tolerances.
 #[derive(Clone, Copy, Debug)]
 pub struct CompressSettings {
     /// Linear units.
@@ -31,8 +31,7 @@ impl Default for CompressSettings {
     }
 }
 
-/// Port of `CompressionStats`. Byte counts use the C++ element sizes so the two
-/// trees' estimates stay comparable.
+/// Byte counts use fixed per-element sizes, so estimates are comparable.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CompressionStats {
     pub keys_before: usize,
@@ -68,8 +67,7 @@ impl CompressionStats {
     }
 }
 
-/// The two key value types a track can hold. Static dispatch only: the C++ used
-/// templates for exactly this.
+/// The two key value types a track can hold, statically dispatched.
 trait TrackValue: Copy {
     /// `sizeof(Keyframe<T>)`: time plus value.
     const KEY_BYTES: usize;

@@ -1,10 +1,8 @@
 // The depth prepass and the shadow map: one vertex stage, no colour output.
 //
 // `ShaderSet::fragment_for` returns `None` for the depth variant, so this module
-// has a vertex entry point and nothing else. The C++ has no depth-only pipeline;
-// its depth came from the same model shader writing to a depth attachment, which
-// is what `depthWrite` on the model pipeline did. A prepass is cheaper and is
-// what the shadow map needs.
+// has a vertex entry point and nothing else. A prepass is cheaper than writing
+// depth from the model shader, and is what the shadow map needs.
 
 struct Shadow {
     light_view_projection: mat4x4<f32>,

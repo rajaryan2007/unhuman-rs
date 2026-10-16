@@ -2,8 +2,8 @@
 //!
 //! Pure CPU. Nothing here touches a device, and the one fixture that is not
 //! inline is the engine's own shipped face, resolved by walking up from this
-//! crate rather than by a fixed `../../` — a depth-sensitive path that resolves
-//! to nothing is how a suite reports green having tested nothing.
+//! crate rather than a fixed `../../`; a path that silently resolves to nothing
+//! is how a suite reports green having tested nothing.
 
 use std::path::{Path, PathBuf};
 
@@ -30,8 +30,7 @@ fn asset(relative: &str) -> PathBuf {
     panic!("could not find {relative} above {}", manifest.display());
 }
 
-/// The hand-written atlas. The C++ tree has none: `Font.cpp` generated its atlas
-/// at runtime, so this is the smallest file with the `msdf-atlas-gen` schema.
+/// The hand-written atlas: the smallest file with the `msdf-atlas-gen` schema.
 fn fixture() -> Atlas {
     let path = asset("assets/fonts/test-atlas.json");
     let json = std::fs::read_to_string(&path).expect("the atlas fixture is readable");
@@ -83,7 +82,7 @@ fn an_atlas_without_kerning_or_a_distance_range_still_parses() {
 
     assert_eq!(atlas.len(), 1);
     assert_eq!(atlas.kerning(A, A), 0.0);
-    // What `Font.cpp` hardcoded when the JSON did not carry it.
+    // The distance range a minimal atlas defaults to.
     assert_eq!(atlas.metrics.distance_range, 2.0);
     assert!(atlas.is_msdf());
     assert!(near(atlas.scale(), 1.0));
@@ -164,8 +163,8 @@ fn a_missing_glyph_uses_the_fallback() {
 
     let out = layout("Az", &atlas, &LayoutOptions::default());
     assert_eq!(out.placements.len(), 2);
-    // The codepoint is kept — it is what the caller asked for — but the quad is
-    // the fallback glyph's, so the character is not dropped from the run.
+    // The codepoint is kept, since it is what the caller asked for, but the quad
+    // is the fallback glyph's, so the character is not dropped from the run.
     assert_eq!(out.placements[1].codepoint, Z);
     assert_eq!(out.placements[1].quad.uv, out.placements[0].quad.uv);
     assert!(near(out.placements[1].pen_x, 0.3));

@@ -1,19 +1,18 @@
-// The editor grid. Port of `UHE_EDITOR/assets/shaders/Grid.slang`.
+// The editor grid.
 //
 // Six vertices from `@builtin(vertex_index)` cover the viewport; the shader
 // unprojects the near and far planes, intersects that ray with the y = 0 plane,
 // and draws a fading grid with a screen-space-constant line width. The axis
 // lines are coloured: x red, z blue.
 //
-// Two differences from the Slang original, both forced:
-//   * the two matrices arrived as push constants, which this RHI cannot declare,
-//     so they are a uniform block;
-//   * the grid pass has no depth attachment here (see `PipelineKey::grid`), so
-//     the fragment returns colour alone. `SV_Depth` cannot be written without
-//     one, and a pipeline whose shader writes `@builtin(frag_depth)` against a
-//     pass with no depth is rejected outright -- which is exactly how the editor
-//     failed to open at all. The grid blends over the scene instead of being
-//     depth-occluded, and the distance fade does the work `SV_Depth` did.
+// Two constraints:
+//   * the two matrices are a uniform block, because the RHI cannot declare push
+//     constants;
+//   * the grid pass has no depth attachment (see `PipelineKey::grid`), so the
+//     fragment returns colour alone: a pipeline whose shader writes
+//     `@builtin(frag_depth)` against a pass with no depth is rejected outright.
+//     The grid blends over the scene instead of being depth-occluded, and the
+//     distance fade does the work a fragment depth would.
 
 struct Grid {
     view_projection: mat4x4<f32>,
@@ -41,8 +40,7 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
 
     let pos = positions[index];
 
-    // Depth 0 is the near plane and 1 the far one, because the projection is
-    // 0..1 (`GLM_FORCE_DEPTH_ZERO_TO_ONE`).
+    // Depth 0 is the near plane and 1 the far one: the projection is 0..1.
     let near_clip = vec4<f32>(pos.x, pos.y, 0.0, 1.0);
     let far_clip = vec4<f32>(pos.x, pos.y, 1.0, 1.0);
 

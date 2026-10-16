@@ -1,15 +1,9 @@
 //! Composition: the scene colour and the occlusion into the swapchain image.
 //!
-//! The C++ draws its geometry straight into the swapchain image, so it has no
-//! pass corresponding to this one. Two things in the Rust port need it:
-//!
-//! * the AO texture has to be *applied* somewhere, and the graph refuses a pass
-//!   that reads and writes one resource, so it cannot be applied to the colour
-//!   target it read (`compiler.rs`, `ErrorKind::PassStateConflict`);
-//! * the 2D and text slice draws into the scene colour rather than into the
-//!   swapchain, so something has to put the result there.
-//!
-//! One full-screen triangle, no vertex buffer.
+//! The AO texture cannot be applied in the pass that reads it, because the graph
+//! refuses a pass that reads and writes one resource (`compiler.rs`,
+//! `ErrorKind::PassStateConflict`); the 2D and text slice draw into the scene
+//! colour, so both are resolved here. One full-screen triangle, no vertex buffer.
 
 use chassis::{BindGroup, CommandList, PassScope, Pipeline};
 

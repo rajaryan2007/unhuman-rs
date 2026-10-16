@@ -1,17 +1,7 @@
 //! The frame's passes, and the seam a backend records them through.
 //!
-//! Mirrors `UHE/Renderer3D/Renderer3D.cpp` plus the passes the graph makes
-//! possible: a depth prepass (which is also the shadow map), the sky clear, the
-//! opaque and transparent geometry, ambient occlusion, the editor's grid and
-//! gizmo lines, and the composition into the swapchain image.
-//!
-//! ## One recorder, dispatched by pass name
-//!
-//! `PassRecorder` is implemented once, here, and both backends call it
-//! (`chassis::graph::pass`). A backend knows nothing about geometry; the
-//! renderer knows nothing about command pools. The dispatch is by the pass's
-//! name because a graph pass carries no closure — that is deliberate, so a
-//! compiled frame is pure data a worker thread can own.
+//! The dispatch is by pass name rather than closure, so a compiled frame stays
+//! pure data a worker thread can own.
 
 pub mod composite;
 pub mod editor;
@@ -51,9 +41,8 @@ pub const PASS_COMPOSITE: &str = "composite";
 
 /// The graph slots this frame's passes are attached to.
 ///
-/// `backbuffer` names the swapchain image, which the *executor* resolves: a
-/// swapchain image has no RHI `Texture` handle, so the only object that can turn
-/// an acquired image into a barrier target is the backend.
+/// Only the backend can resolve `backbuffer`, because a swapchain image has no
+/// RHI `Texture` handle to turn into a barrier target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameTargets {
     pub scene_color: TextureId,
@@ -65,9 +54,8 @@ pub struct FrameTargets {
 
 /// Passes this crate does not own: the 2D batch and the text slice.
 ///
-/// `batch2d` and `text` are that slice's; this is the seam, so a frame can
-/// include them without this crate knowing how they draw. `declare` is called
-/// while the frame's graph is open, `record` for each pass name it declared.
+/// `declare` is called while the frame's graph is open, `record` for each pass
+/// name it declared.
 pub trait OverlayPasses: Send + Sync {
     fn declare(&self, graph: &mut chassis::graph::RenderGraph, targets: &FrameTargets);
     fn record(
@@ -80,9 +68,9 @@ pub trait OverlayPasses: Send + Sync {
 
 /// Every recorder of one frame, already prepared.
 ///
-/// Built after the frame's textures and uniform buffers exist, then shared with
-/// the backend as one `Arc<dyn PassRecorder>`. Nothing is mutated while
-/// recording, which is what lets a backend record passes on worker threads.
+/// Built once the frame's textures and uniform buffers exist, then shared with
+/// the backend as one `Arc<dyn PassRecorder>`; nothing mutates while recording,
+/// so a backend may record passes on worker threads.
 pub struct FrameRecorder {
     pub shadow: Option<ShadowPass>,
     pub geometry: Option<GeometryPass>,

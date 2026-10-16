@@ -1,9 +1,9 @@
 // Composition: the scene colour times the ambient occlusion, into the swapchain
 // image.
 //
-// The C++ draws straight into the swapchain and has no such pass. Both textures
-// are the same size as the target, so this is a straight fetch at the pixel's
-// own uv with no filtering to speak of, and the triangle covers the viewport.
+// Both textures are the same size as the target, so this is a straight fetch at
+// the pixel's own uv with no filtering to speak of, and the triangle covers the
+// viewport.
 
 @group(0) @binding(0) var scene_color: texture_2d<f32>;
 @group(0) @binding(1) var ambient_occlusion: texture_2d<f32>;

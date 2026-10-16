@@ -1,25 +1,14 @@
 //! The 2D and text slice's passes, wired into a bifrost frame.
 //!
-//! `batch2d` and `text` own the shaders, the pipelines, the batching, the
-//! vertex formats and the drawing loop — everything about *how* a sprite or a
-//! glyph is drawn. This is the other half: which passes a frame declares, what
-//! they read and write, the buffers each batch's contents need, and the bind
-//! groups their texture lookups resolve to.
+//! `batch2d` and `text` own how a sprite or glyph is drawn; this owns which passes
+//! a frame declares, what they read and write, the buffers each batch's contents
+//! need, and the bind groups their texture lookups resolve to.
 //!
-//! ## Interior mutability, and why
-//!
-//! A caller pushes quads and text runs with `edit`, before `prepare` uploads the
-//! result, and the frame holds the same object as `Arc<dyn OverlayPasses>` to
-//! record with. So the batching state is behind a mutex: one owner per frame,
-//! two accessors, and a `PassRecorder` that has to be `Sync` because a backend
-//! may record passes on worker threads. A `Cell` would be enough for one thread
-//! and would silently stop that.
-//!
-//! ## Why the buffers are per frame
-//!
-//! `Resources` has no update-in-place call, so the vertices a frame produced are
-//! created (and the previous frame's destroyed) in `prepare`. One allocation per
-//! batch per frame; `batch2d::create_buffers` says the same.
+//! The batching state is behind a mutex because a caller edits it before `prepare`
+//! uploads, while the frame holds the same object as `Arc<dyn OverlayPasses>` to
+//! record with, and a backend may record on worker threads. Buffers are per frame
+//! because `Resources` has no update-in-place call, so `prepare` creates this
+//! frame's vertices and destroys the previous frame's.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -52,9 +41,8 @@ struct State {
     sprite_globals: Option<Globals>,
     text_globals: Option<Globals>,
 
-    /// One group per distinct texture a batch bound. `None` is the untextured
-    /// case, which binds the 1x1 white texel the C++ keeps in slot 0
-    /// (`Renderer2D.cpp:30,127-131`).
+    /// One group per distinct texture a batch bound; `None` is the untextured
+    /// case, which binds the 1x1 white texel in slot 0.
     sprite_textures: HashMap<Option<Texture>, BindGroup>,
     text_textures: HashMap<Texture, BindGroup>,
 }
@@ -175,8 +163,8 @@ impl SpriteTextOverlay {
 
     /// Uploads this frame's batches and builds their bind groups.
     ///
-    /// `textures` resolves a batch's texture to the view that will be bound — the
-    /// caller owns the asset-to-view half, because it owns the asset registry.
+    /// `textures` resolves a batch's texture to the view that will be bound; the
+    /// caller owns the asset-to-view half because it owns the asset registry.
     /// `atlas_texture` is the view of the font atlas, and `white` is the view an
     /// untextured quad binds.
     // The atlas view, the white view, the sampler and the per-batch textures are

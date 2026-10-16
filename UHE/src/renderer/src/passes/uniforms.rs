@@ -1,21 +1,16 @@
 //! The uniform blocks the shaders read, and the buffers they live in.
 //!
-//! The C++ carried all of this in a 192-byte push-constant block
-//! (`Renderer3D.cpp:352-378`) plus a per-frame material region. **Push constants
-//! are not usable through this RHI**: `PipelineDesc` has no push-constant range,
-//! `VulkanPipelineState.rs:222` declares `push_constant_ranges(&[])` so any
-//! `vkCmdPushConstants` is a validation error, and wgpu's
-//! `CommandList::set_push_constants` is `unimplemented!()` -- it panics rather
-//! than pushing anything. The renderer never calls it. So the same values
-//! travel as uniform buffers, and a draw's block is bound through a descriptor
-//! set rather than pushed.
+//! Push constants are not usable through this RHI: `PipelineDesc` has no
+//! push-constant range, the Vulkan pipeline declares `push_constant_ranges(&[])`
+//! so any `vkCmdPushConstants` is a validation error, and wgpu's
+//! `CommandList::set_push_constants` is `unimplemented!()`, which panics rather
+//! than pushing anything. The renderer never calls it, so the same values travel
+//! as uniform buffers bound through a descriptor set.
 //!
-//! `shortcut: each frame's uniform buffers and their bind groups are re-created`
-//! `because Resources has no update-in-place call (create_buffer takes initial`
-//! `contents and that is all). One upload_buffer, or a push-constant range in`
-//! `PipelineDesc, removes this; until then a frame costs one small allocation`
-//! `per draw and the bind groups are handed back with destroy_bind_group, which`
-//! `the Vulkan backend currently ignores.`
+//! Each frame's uniform buffers and bind groups are re-created because `Resources`
+//! has no update-in-place call. One `upload_buffer`, or a push-constant range in
+//! `PipelineDesc`, would remove this; until then a frame costs one small
+//! allocation per draw.
 
 use bytemuck::{Pod, Zeroable};
 use chassis::{
@@ -86,15 +81,13 @@ impl ShadowUniforms {
 
 /// Set 2's uniform: everything that changes per draw.
 ///
-/// The C++'s push constants also carried the buffer *indices* of the material,
-/// light and bone arrays, because it addressed them bindlessly. There is nothing
-/// to index here — the bind groups are the addressing — so what remains is the
-/// model matrix, the entity id and the tint.
+/// The bind groups are the addressing, so this carries only the model matrix, the
+/// entity id and the tint.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct DrawUniforms {
     pub model: [[f32; 4]; 4],
-    /// The entity's tint, which `MeshSample` carries and the C++ did not have.
+    /// The entity's tint.
     pub tint: [f32; 4],
     /// `x` = entity id, `y` = use vertex colour, `z`/`w` unused.
     pub params: [f32; 4],
@@ -110,13 +103,11 @@ impl DrawUniforms {
     }
 }
 
-/// One descriptor set whose contents are uploaded as a unit: a uniform block,
-/// plus whatever else its layout binds.
+/// One descriptor set whose contents are uploaded as a unit: a uniform block, plus
+/// whatever else its layout binds.
 ///
-/// Rebuilt rather than written into, for the reason in this module's header.
-/// The previous buffer and group are released with the destroy calls before the
-/// new ones are made, so a frame holds one of each per set rather than one per
-/// frame for the process's life.
+/// Rebuilt rather than written into, for the reason in this module's header; the
+/// previous buffer and group are released before the new ones are made.
 pub struct BindSet {
     buffer: Option<Buffer>,
     group: Option<BindGroup>,
@@ -150,8 +141,7 @@ impl BindSet {
         )?;
 
         // The set's own uniform is binding 0, which is what every layout here
-        // declares: the C++'s push-constant block, in the one place a set can
-        // put it.
+        // declares.
         let mut entries = vec![(0u32, buffer, 0u64)];
         entries.extend_from_slice(buffers);
 
@@ -183,10 +173,10 @@ impl Default for BindSet {
 
 /// A descriptor set with no uniform block at all: only images and samplers.
 ///
-/// The composite pass is the one that needs this — it reads two textures and
-/// uploads nothing — and it is separate from [`BindSet`] because a `BindSet`
-/// always allocates a uniform buffer for binding 0, which a layout without that
-/// binding cannot accept.
+/// The composite pass is the one that needs this, reading two textures and
+/// uploading nothing; it is separate from [`BindSet`] because a `BindSet` always
+/// allocates a uniform buffer for binding 0, which a layout without that binding
+/// cannot accept.
 pub struct ImageSet {
     group: Option<BindGroup>,
 }
@@ -228,10 +218,9 @@ impl Default for ImageSet {
 
 /// One buffer holding a block per draw, and the group that binds each block.
 ///
-/// The C++'s per-draw data was a push-constant block, which needs no buffer at
-/// all. This is the closest the RHI allows: one buffer created once per frame
-/// with every draw's block in it, and one group per block, each with its byte
-/// offset baked in — there are no dynamic descriptor offsets either.
+/// One buffer is created once per frame with every draw's block in it, and one
+/// group per block with its byte offset baked in, because there are no dynamic
+/// descriptor offsets either.
 pub struct DrawArena {
     buffer: Option<Buffer>,
     groups: Vec<BindGroup>,

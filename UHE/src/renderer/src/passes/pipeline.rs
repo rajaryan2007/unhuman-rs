@@ -1,17 +1,10 @@
 //! Pipelines: what a pipeline is keyed by, and where the shaders come from.
 //!
-//! Port of the pipeline half of `Renderer3D::Init` (`Renderer3D.cpp:60-140`):
-//! the model pipeline and its double-sided variant differ only in cull mode, so
-//! cull mode is part of the cache key rather than state a draw can change. The
-//! grid pipeline, the depth pipeline, and the three the C++ has no counterpart
-//! for (SSAO, lines, composite) are the same shape.
+//! The model pipeline and its double-sided variant differ only in cull mode, so
+//! cull mode is part of the cache key rather than state a draw can change.
 //!
-//! ## Why the shaders are WGSL
-//!
-//! `Renderer3D::Init` compiled `Basic3D.slang` through the vendored Slang
-//! binary. `forge::wgsl` compiles WGSL in process instead, so the renderer's own
-//! shaders are built by a library that is always present, and both backends take
-//! the same SPIR-V.
+//! Shaders are WGSL, compiled in process by `forge::wgsl`, so the renderer's own
+//! shaders need no external toolchain and both backends take the same SPIR-V.
 
 use std::collections::HashMap;
 
@@ -29,9 +22,8 @@ pub const DRAW_SET: u32 = 2;
 
 /// The shader sources, embedded rather than resolved at run time.
 ///
-/// The C++ built a path from the process's root directory (`Renderer3D.cpp:63`)
-/// and a missing shader was a silent null handle. `include_str!` makes a missing
-/// one a compile error, and a test compiles every one of them to SPIR-V.
+/// `include_str!` makes a missing source a compile error rather than a silent null
+/// handle, and a test compiles every one of them to SPIR-V.
 pub const MODEL_WGSL: &str = include_str!("../../assets/shaders/model.wgsl");
 pub const DEPTH_WGSL: &str = include_str!("../../assets/shaders/depth.wgsl");
 pub const SSAO_WGSL: &str = include_str!("../../assets/shaders/ssao.wgsl");
@@ -48,11 +40,9 @@ fn graphics_stages() -> StageMask {
 
 /// Set 0: the frame.
 ///
-/// One per frame: the view-projection, the light list, and the shadow map's
-/// depth texture. The C++ passed the first two through push constants and
-/// indexed the lights through a bindless array; neither is expressible here —
-/// `ChassisResources` refuses an empty push-constant range and wgpu has no
-/// combined image sampler — so the frame is a set like any other.
+/// The view-projection, the light list, and the shadow map's depth texture. Push
+/// constants and a bindless array are not expressible through this RHI, so the
+/// frame is a set like any other.
 pub fn frame_layout() -> DescriptorSetLayoutDesc {
     DescriptorSetLayoutDesc::new("frame")
         .with(binding(0, DescriptorKind::UniformBuffer, graphics_stages()))
@@ -74,9 +64,8 @@ pub fn frame_layout() -> DescriptorSetLayoutDesc {
 
 /// Set 1: one material's parameters and its maps.
 ///
-/// Bindings 2..7 are the five slots in C++ `MaterialTextureSlot` order. A map
-/// the material does not declare binds the 1x1 white texture, which is what
-/// `Renderer3D`'s `WhiteTexture` is for, so a slot is never unbound.
+/// A map the material does not declare binds the 1x1 white texture, so no slot is
+/// ever unbound.
 pub fn material_layout() -> DescriptorSetLayoutDesc {
     let fragment = StageMask::of(ShaderStage::Fragment);
     let mut layout = DescriptorSetLayoutDesc::new("material")
@@ -101,7 +90,7 @@ pub fn draw_layout() -> DescriptorSetLayoutDesc {
     ))
 }
 
-/// The prepass's set: the light-space view-projection. Vertex stage only — the
+/// The prepass's set: the light-space view-projection. Vertex stage only; the
 /// depth pipeline has no fragment stage at all.
 pub fn shadow_layout() -> DescriptorSetLayoutDesc {
     DescriptorSetLayoutDesc::new("shadow").with(binding(
@@ -120,7 +109,7 @@ pub fn line_layout() -> DescriptorSetLayoutDesc {
     ))
 }
 
-/// The grid pass's set: the two matrices `Grid.slang`'s push constants held.
+/// The grid pass's set: the view-projection and its inverse.
 pub fn grid_layout() -> DescriptorSetLayoutDesc {
     DescriptorSetLayoutDesc::new("grid").with(binding(
         0,
@@ -154,9 +143,8 @@ fn binding(binding: u32, kind: DescriptorKind, stages: StageMask) -> chassis::Bi
 
 /// The shader modules every pipeline is built from.
 ///
-/// Two modules per pipeline: Vulkan has no linked stage, so a pair is two
-/// modules with two entry points compiled from one source (`Forge::compile_pair`
-/// says the same thing for Slang).
+/// Two modules per pipeline: Vulkan has no linked stage, so a pair is two modules
+/// with two entry points compiled from one source.
 pub struct ShaderSet {
     pub model_vertex: Shader,
     pub model_fragment: Shader,
@@ -296,9 +284,9 @@ impl ShaderSet {
             | ShaderVariant::ModelDoubleSided
             | ShaderVariant::ModelTransparent
             | ShaderVariant::ModelTransparentDoubleSided => Some(self.model_fragment),
-            // A depth-only pipeline has no fragment stage: the C++ depth prepass
-            // is the same draw with no colour target, and Vulkan allows a
-            // pipeline with only a vertex stage.
+            // A depth-only pipeline has no fragment stage: the prepass is the same
+            // draw with no colour target, and Vulkan allows a pipeline with only a
+            // vertex stage.
             ShaderVariant::Shadow => None,
             ShaderVariant::Ssao => Some(self.ssao_fragment),
             ShaderVariant::Grid => Some(self.grid_fragment),
@@ -384,8 +372,7 @@ pub struct PipelineKey {
 }
 
 impl PipelineKey {
-    /// An opaque model pipeline for one colour target and one depth format,
-    /// which is the C++ `ModelPipeline`'s description.
+    /// An opaque model pipeline for one colour target and one depth format.
     pub fn model(
         variant: ShaderVariant,
         color: TextureFormat,
@@ -398,7 +385,7 @@ impl PipelineKey {
             color_targets: vec![color],
             depth: Some(depth),
             depth_write: true,
-            // `VK_COMPARE_OP_LESS`, the C++ `depthTest = true` default.
+            // `VK_COMPARE_OP_LESS`, the default depth test.
             depth_compare: 1,
             samples,
             index_format: Some(mesh::INDEX_FORMAT),
@@ -437,8 +424,8 @@ impl PipelineKey {
         }
     }
 
-    /// The C++ grid: six vertices from `@builtin(vertex_index)`, no depth test
-    /// because the pass it runs in has no depth attachment.
+    /// The grid: six vertices from `@builtin(vertex_index)`, no depth test because
+    /// the pass it runs in has no depth attachment.
     pub fn grid(color: TextureFormat, samples: SampleCount) -> Self {
         Self::fullscreen(ShaderVariant::Grid, color, samples)
     }
@@ -506,8 +493,8 @@ pub fn pipeline_desc(key: &PipelineKey, shaders: &ShaderSet) -> PipelineDesc {
         ShaderVariant::Line => vec![line_layout()],
         ShaderVariant::Ssao => vec![ssao_layout()],
         ShaderVariant::Composite => vec![composite_layout()],
-        // The C++ grid pipeline took no descriptors because its matrices came
-        // from push constants, which this RHI cannot declare.
+        // The grid's matrices are a uniform block, because this RHI cannot declare
+        // push constants.
         ShaderVariant::Grid => vec![grid_layout()],
     };
 
@@ -587,9 +574,8 @@ impl PipelineCache {
 
     /// The pipeline for this key, created once.
     ///
-    /// `create_pipeline` is the expensive call an engine makes at startup and
-    /// the C++ makes for exactly two variants; caching by key is what keeps a
-    /// scene with forty double-sided materials from creating forty pipelines.
+    /// `create_pipeline` is expensive, so caching by key keeps a scene with forty
+    /// double-sided materials from creating forty pipelines.
     pub fn get_or_create(
         &mut self,
         resources: &mut dyn Resources,

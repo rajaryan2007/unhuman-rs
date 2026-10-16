@@ -1,23 +1,20 @@
 // The MSDF text draw. One glyph atlas and one view-projection per draw call: the
 // layout puts every glyph of a run in one vertex buffer, so a run is one
-// `draw_indexed` rather than the C++ one-per-glyph path with its 32-slot
-// descriptor array.
+// `draw_indexed` rather than one draw per glyph with a 32-slot descriptor array.
 //
 // ## Bindings
 //
-// Set 0, binding 0 is a `SampledImage`, binding 1 a `Sampler` -- separate, for
-// the same reason the root `assets/shaders/Textured.slang` documents: wgpu has
-// no combined descriptor. Set 1, binding 0 is the view-projection and the atlas
-// parameters the C++ spelt as a push constant (`Renderer2D.cpp:29-33`); the RHI
-// has no push-constant range, so it is a uniform buffer, and separating it from
-// set 0 is what lets a pass bind it once for every text run.
+// Set 0, binding 0 is a `SampledImage`, binding 1 a `Sampler` -- separate,
+// because wgpu has no combined descriptor. Set 1, binding 0 is the
+// view-projection and the atlas parameters; the RHI has no push-constant range,
+// so it is a uniform buffer, and separating it from set 0 is what lets a pass
+// bind it once for every text run.
 //
 // ## Two atlas kinds, one pipeline
 //
 // `globals.atlas.w` selects the reconstruction. A baked `msdf-atlas-gen` atlas
 // is a signed distance field and takes the median-of-three screen-space range
-// path the C++ shader used (the root `assets/shaders/Text.slang`), with one correction:
-// the C++ divided the pixel range by a hardcoded `float2(1024.0, 1024.0)`, which
+// path, with one correction: dividing the pixel range by a hardcoded 1024x1024
 // is wrong for every atlas that is not 1024x1024, so the real atlas size and
 // distance range come from the atlas instead. The atlas `font::generate` builds
 // at startup out of `ab_glyph` is plain coverage, where the alpha *is* the

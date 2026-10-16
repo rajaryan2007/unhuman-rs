@@ -1,16 +1,14 @@
 //! Lights, in the layout the shader reads.
 //!
-//! Port of `UHE/Renderer3D/LightSystem.{h,cpp}`. The C++ walked three entity
-//! views and a glTF node list itself; `meats::Scene::lights` now produces the
-//! same values already placed in world space, so this module keeps the *GPU*
-//! half: the four-`vec4` record, and the per-frame buffer it lives in.
+//! `meats::Scene::lights` produces the values already placed in world space, so
+//! this module keeps the GPU half: the four-`vec4` record and the buffer it lives
+//! in.
 
 use bytemuck::{Pod, Zeroable};
 use chassis::{Buffer, BufferDesc, BufferUsage, Resources};
 use glam::Vec3;
 
-/// One light in the GPU list. Byte-identical to `RD3d::LightData` and to the
-/// `LightData` struct in `Basic3D.slang`.
+/// One light in the GPU list. Byte-identical to the shader's `LightData`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct LightData {
@@ -31,8 +29,7 @@ pub const TYPE_DIRECTIONAL: f32 = 0.0;
 pub const TYPE_POINT: f32 = 1.0;
 pub const TYPE_SPOT: f32 = 2.0;
 
-/// The C++ caps the list at 1024, both in the buffer size and in the draw's
-/// `numLights`.
+/// Maximum lights per frame, in both the buffer size and the draw count.
 pub const MAX_LIGHTS: usize = 1024;
 
 impl LightData {
@@ -54,8 +51,8 @@ impl LightData {
         }
     }
 
-    /// Cone angles in radius, stored as cosines. Normalized direction, as the
-    /// C++ does: the shader's cone test is a dot product against a unit axis.
+    /// Cone angles in radians, stored as cosines. Direction is normalized because
+    /// the shader's cone test is a dot product against a unit axis.
     pub fn spot(
         position: Vec3,
         direction: Vec3,
@@ -75,8 +72,7 @@ impl LightData {
     }
 
     /// `meats::LightSample` carries degrees for the cone angles, as the editor
-    /// edits them; the C++ component carried radians. Converted here, once, so
-    /// no shader has to.
+    /// edits them; converted here so no shader has to.
     pub fn from_sample(sample: &meats::LightSample) -> Self {
         match sample.kind {
             meats::LightKind::Directional => {
@@ -107,11 +103,9 @@ impl LightData {
 
 /// The frame's light list, and the buffer it is uploaded into.
 ///
-/// `Resources` has no update-a-buffer call — `create_buffer` takes initial
-/// contents and that is all — so the buffer is re-created when the list
-/// *changes*, and left alone when it does not. The C++ re-uploaded into a
-/// persistent host-visible buffer every `BeginScene`; a static scene pays
-/// nothing here, and a scene whose lights move pays one small allocation.
+/// `Resources` has no update-a-buffer call, so the buffer is re-created when the
+/// list changes and left alone when it does not: a static scene pays nothing, and
+/// a scene whose lights move pays one small allocation.
 pub struct LightBuffer {
     buffer: Option<Buffer>,
     uploaded: Vec<LightData>,
@@ -126,7 +120,7 @@ impl LightBuffer {
     }
 
     /// The buffer holding `lights`, re-created only if it does not hold them
-    /// already. Truncated to `MAX_LIGHTS`, as the C++ truncates `numLights`.
+    /// already. Truncated to `MAX_LIGHTS`.
     pub fn ensure(
         &mut self,
         resources: &mut dyn Resources,
@@ -177,9 +171,8 @@ impl Default for LightBuffer {
 
 /// Every enabled light in the scene, in the GPU layout.
 ///
-/// The C++ `LightSystem::ExtractLights` also ends with a default directional
-/// light when nothing was found, so that an unlit scene is lit rather than
-/// black; that is kept, and is why this never returns an empty list.
+/// Falls back to a default directional light when the scene has none, so an unlit
+/// scene is lit rather than black; this never returns an empty list.
 pub fn extract(scene: &meats::Scene) -> Vec<LightData> {
     let mut lights: Vec<LightData> = scene.lights().iter().map(LightData::from_sample).collect();
 

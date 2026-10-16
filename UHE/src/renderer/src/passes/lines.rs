@@ -1,15 +1,11 @@
 //! The editor's grid, and gizmo lines.
 //!
-//! Port of `Renderer3D::DrawGrid` (`Renderer3D.cpp:243-262`) — six vertices from
-//! `Grid.slang`, with the view-projection and its inverse, and the shader
-//! reconstructing a world-space ray per pixel and drawing a fading grid on the
-//! y = 0 plane. The C++ passed the two matrices as push constants; this RHI
-//! cannot declare a push-constant range, so they are a uniform block, which is
-//! the same data by another route.
+//! The grid is six vertices from `@builtin(vertex_index)`, with the view-projection
+//! and its inverse; the shader reconstructs a world-space ray per pixel and draws a
+//! fading grid on the y = 0 plane. The two matrices are a uniform block because this
+//! RHI cannot declare a push-constant range.
 //!
-//! The gizmo half is new: the C++ draws nothing but the grid, and an editor with
-//! nothing else to draw lines with hand-rolled its own pass. A line list with a
-//! per-vertex colour is the smallest thing that draws a gizmo.
+//! A line list with a per-vertex colour is the smallest thing that draws a gizmo.
 
 use bytemuck::{Pod, Zeroable};
 use chassis::{BindGroup, Buffer, CommandList, PassScope, Pipeline};
@@ -19,7 +15,7 @@ pub const GRID_SET: u32 = 0;
 /// Bind group number within the line shader.
 pub const LINE_DRAW_SET: u32 = 0;
 
-/// The two matrices `Grid.slang`'s push-constant block held.
+/// The two matrices the grid shader needs: the view-projection and its inverse.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 pub struct GridUniforms {
@@ -63,8 +59,8 @@ impl LineUniforms {
     }
 }
 
-/// The C++ grid pipeline, drawn as six vertices with no vertex buffer: the
-/// quad comes from `@builtin(vertex_index)`.
+/// The grid pipeline, drawn as six vertices with no vertex buffer: the quad comes
+/// from `@builtin(vertex_index)`.
 pub struct GridPass {
     pipeline: Pipeline,
     group: BindGroup,

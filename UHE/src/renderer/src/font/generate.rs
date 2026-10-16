@@ -1,21 +1,19 @@
 //! Runtime atlas generation from a TTF.
 //!
-//! This is the half the C++ did in-process (`UHE/src/UHE/Renderer/Font.cpp:96-190`):
-//! load the face, take a glyph set, rasterize, pack, and hand back the same
+//! Load the face, take a glyph set, rasterize, pack, and hand back the same
 //! record the JSON parser produces. It exists because `fonts/Inter.ttf` ships
-//! with the engine and `Font2D::GetDefault()` was "rasterize the default face at
-//! startup", not "load a baked atlas".
+//! with the engine and the default face is rasterized at startup rather than
+//! loaded from a baked atlas.
 //!
 //! ## This is a coverage atlas, not an MSDF one
 //!
 //! `ab_glyph` rasterizes glyph *coverage*, and coverage is not a distance field:
 //! it has no median-of-three reconstruction and no screen-space range to widen.
 //! It is correct at the size it was rasterized at and soft at any other, where
-//! an MSDF atlas stays sharp. That is a real difference and it is left visible
-//! rather than papered over: `Atlas::is_msdf` is false here and the shader takes
+//! an MSDF atlas stays sharp. `Atlas::is_msdf` is false here and the shader takes
 //! its plain-alpha path (`assets/shaders/text.wgsl`). Runtime MSDF generation is
-//! msdfgen's edge colouring and distance computation, which needs a C++ library
-//! at build time and is not ported; a pre-baked atlas is the MSDF path.
+//! msdfgen's edge colouring and distance computation, which is not implemented
+//! here; a pre-baked atlas is the MSDF path.
 //!
 //! The coordinates are the atlas JSON's, not a second convention: plane bounds in
 //! em units with y up from the baseline, UVs normalized and y down from the top
@@ -29,17 +27,16 @@ use glam::Vec2;
 
 use crate::font::atlas::{Atlas, Glyph, Metrics};
 
-/// What `Font2D::GetDefault()` rasterized at (`Font.cpp:23`, `genSizePx = 64`).
-/// Smaller here because this is coverage, where the size is the resolution.
+/// Rasterization size. Coverage makes the size the resolution.
 pub const DEFAULT_PIXEL_SIZE: u32 = 48;
 
-/// The C++ charset: `{0x0020, 0x00FF}` (`Font.cpp:124`).
+/// Default charset: Latin-1.
 pub const DEFAULT_FIRST_CODEPOINT: u32 = 0x20;
 pub const DEFAULT_LAST_CODEPOINT: u32 = 0xFF;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GeneratorOptions {
-    /// Em size in pixels — the rasterization resolution.
+    /// Em size in pixels: the rasterization resolution.
     pub pixel_size: u32,
     pub first_codepoint: u32,
     pub last_codepoint: u32,
@@ -122,9 +119,8 @@ pub fn generate(ttf: &[u8], options: &GeneratorOptions) -> Result<Atlas, Generat
                 continue;
             };
             let glyph_id = font.glyph_id(character);
-            // Glyph 0 is `.notdef`: the character is not in this face. The C++
-            // `loadCharset` skipped them and reported how many it loaded, so the
-            // atlas's size is the count of characters the font actually has.
+            // Glyph 0 is `.notdef`: the character is not in this face, so the
+            // atlas holds only the characters the font actually has.
             if glyph_id.0 == 0 {
                 continue;
             }
@@ -247,9 +243,8 @@ pub fn generate(ttf: &[u8], options: &GeneratorOptions) -> Result<Atlas, Generat
 type PackedSheet = (u32, u32, Vec<Option<(u32, u32)>>);
 
 /// Shelf packing: tallest first, left to right, a new row when the current one
-/// is full (`TightAtlasPacker`'s job in the C++, `Font.cpp:151-153`). No
-/// rotation and no repacking — the C++ used a tight packer, and the difference
-/// is atlas area, not correctness.
+/// is full. No rotation and no repacking; the difference is atlas area, not
+/// correctness.
 fn pack(rasters: &[Raster], options: &GeneratorOptions) -> Result<PackedSheet, GenerateError> {
     let width = options.atlas_width.max(1);
     let padding = options.padding;

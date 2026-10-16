@@ -1,8 +1,6 @@
-// Gizmo lines: a line list with a per-vertex colour.
-//
-// Not a port: the C++ draws nothing but the grid, so an editor with anything
-// else to draw had to roll its own pass. Two matrices — the camera's and the
-// batch's own model matrix — and one vertex buffer.
+// A generic line pass: the editor overlays gizmos and the grid through it. A
+// line list with a per-vertex colour, two matrices (the camera's and the batch's
+// own model) and one vertex buffer.
 
 struct LineFrame {
     view_projection: mat4x4<f32>,

@@ -1,13 +1,12 @@
 // Screen-space ambient occlusion, from the depth buffer alone.
 //
-// The C++ has no kernel to port (`SSAO.cpp` is `void init() {}`), so this is the
-// standard formulation: reconstruct the view-space position of the pixel,
+// The standard formulation: reconstruct the view-space position of the pixel,
 // offset it by each kernel sample, project the sample back and compare its depth
 // against what the depth buffer holds there.
 //
-// The projection is Vulkan's: right-handed, depth 0..1 (`GLM_FORCE_DEPTH_ZERO_TO_ONE`
-// is set in the C++ tree), and NDC +Y maps to the *top* of the framebuffer, which
-// is why the y term of every reprojection below is negated.
+// The projection is right-handed with depth 0..1, and NDC +Y maps to the *top*
+// of the framebuffer, which is why the y term of every reprojection below is
+// negated.
 
 struct Ssao {
     // Hemisphere samples, in view space, length <= 1.

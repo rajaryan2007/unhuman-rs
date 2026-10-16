@@ -117,7 +117,7 @@ fn a_quad_is_four_vertices_and_six_indices() {
     assert_eq!(batch.batches().len(), 1);
     assert_eq!(size_of::<SpriteVertex>(), 40);
 
-    // The C++ index pattern (`Renderer2D.cpp:79-92`), per quad.
+    // The per-quad index pattern: 0,1,2, 2,3,0.
     assert_eq!(&batch.indices()[..6], &[0, 1, 2, 2, 3, 0]);
     assert_eq!(&batch.indices()[6..12], &[4, 5, 6, 6, 7, 4]);
     // Untextured quads carry the white-texel UVs and no tiling.

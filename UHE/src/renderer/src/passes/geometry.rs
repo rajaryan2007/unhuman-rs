@@ -1,23 +1,14 @@
 //! The geometry pass: opaque draws, then blended ones.
 //!
-//! Port of `Renderer3D::SubmitMesh` (`Renderer3D.cpp:346-440`): per primitive,
-//! bind the pipeline its material selects, bind its uniforms, bind the vertex
-//! and index buffers, and draw indexed. The C++ switches pipeline per primitive
-//! for exactly one reason — `doubleSided` selects the no-cull variant — and this
-//! does the same, for culling and for blending.
+//! Per primitive: bind the pipeline its material selects, bind its uniforms and
+//! vertex and index buffers, and draw indexed. The pipeline is switched per
+//! primitive because cull mode and blending are pipeline state, not per-draw
+//! state a material can ask for.
 //!
-//! ## Why the transparent draws are not yet a pass of their own
-//!
-//! They should be: a second pass, after this one, with its own depth-tested
-//! pipeline. Without `PassBuilder::depth_load` that pass would have declared
-//! `depth(texture, 1.0)` and *cleared* the depth buffer the opaque draws just
-//! wrote — the transparent geometry drawn with no occlusion test at all, which
-//! is worse than not splitting. `depth_load` landed, so that is no longer the
-//! reason; what is missing is the split itself, and `PASS_TRANSPARENT` is the
-//! slot it will record into. Until then this pass draws the opaques and then the
-//! blended items back to front, which is what the C++ says it does
-//! (`MaterialExtensions.h:29-36`: "drawn after opaques, blended. Needs depth
-//! sorting to avoid artefacts where surfaces overlap").
+//! Transparent draws are not yet a pass of their own. They should be, with their
+//! own depth-tested pipeline; `PASS_TRANSPARENT` is the slot it will record into.
+//! Until then this pass draws the opaques and then the blended items back to
+//! front, which needs depth sorting to avoid artefacts where surfaces overlap.
 
 use chassis::{BindGroup, CommandList, PassScope, Pipeline};
 
@@ -31,9 +22,7 @@ pub const DRAW_SET: u32 = 2;
 
 /// The four pipelines one geometry pass can bind, one per [`MaterialVariant`].
 ///
-/// The C++ builds two and keeps them in `s_Data3D.ModelPipeline` and
-/// `ModelPipelineDoubleSided` (`Renderer3D.cpp:78-95`), for the same reason:
-/// cull mode and blending are pipeline state, so a material cannot ask for them
+/// Cull mode and blending are pipeline state, so a material cannot ask for them
 /// per draw.
 #[derive(Clone, Copy, Debug)]
 pub struct MaterialPipelines {
@@ -60,8 +49,7 @@ pub struct PreparedDraw {
     pub mesh: GpuMesh,
     /// The set that carries this draw's model matrix, tint and entity id.
     pub uniforms: BindGroup,
-    /// `None` draws with the default material, which is the C++'s slot 0
-    /// (`Renderer3D::RestartMaterialRegion`).
+    /// `None` draws with the default material.
     pub material: Option<BindGroup>,
     pub variant: MaterialVariant,
 }
@@ -105,7 +93,7 @@ impl GeometryPass {
 
         // Only rebound when the variant changes: a scene whose materials
         // alternate between culling modes would otherwise pay a pipeline bind
-        // per draw. The C++ binds per primitive.
+        // per draw.
         let mut bound: Option<MaterialVariant> = None;
         for draw in &self.draws {
             if bound != Some(draw.variant) {

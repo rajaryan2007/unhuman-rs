@@ -1,5 +1,5 @@
 //! Animation behaviour: sampling, looping, blending, state transitions and
-//! compression. Pure logic only — no GPU, no window, no device.
+//! compression. Pure logic only, no GPU, no window, no device.
 
 use bifrost::animation::{
     blend_poses, compress_clip, measure_clip, sample_position, sample_rotation, Animator, Bone,
@@ -129,8 +129,8 @@ fn blend_weights_zero_half_and_one() {
 
     blend_poses(&from, &to, 0.5, &mut out);
     assert_eq!(out.bones[0].translation, Vec3::new(2.0, 0.0, 0.0));
-    // A 180° turn is its own antipode, so the half-way rotation is a 90° turn
-    // in either direction: only the magnitude is determined, not the sign.
+    // A 180 degree turn is its own antipode, so the half-way rotation is a 90
+    // degree turn in either direction: only the magnitude is determined.
     let quarter_turn = out.bones[0].rotation.angle_between(Quat::IDENTITY);
     assert!((quarter_turn - std::f32::consts::FRAC_PI_2).abs() < 1e-4);
 
@@ -280,7 +280,7 @@ fn compression_round_trip_stays_within_tolerance() {
     assert!(stats.key_reduction() > 0.7);
     assert_eq!(stats.tracks_processed, 1);
 
-    // The decoder — the ordinary sampler over the reduced track — stays inside the
+    // The decoder, the ordinary sampler over the reduced track, stays inside the
     // tolerance at every time the original had a key.
     let mut worst = 0.0f32;
     for (i, value) in original_values.iter().enumerate() {

@@ -1,30 +1,19 @@
-//! Screen-space ambient occlusion: the kernel, and the pass that runs it.
+//! Screen-space ambient occlusion: the hemisphere kernel and the pass that runs it.
 //!
-//! ## What the C++ has
-//!
-//! `UHE/Renderer3D/SSAO.{h,cpp}` is a class with a constructor, a destructor and
-//! `void init() {}` — eleven lines of declaration and seven of definition, no
-//! kernel, no parameters, nothing that references the RHI. It is a placeholder
-//! that was never filled in, so there is no kernel to port and this module is
-//! new code with the C++'s name on it.
-//!
-//! The kernel is the standard hemisphere one: samples in the unit hemisphere
-//! around +Z, scaled so that later samples cluster near the origin, which is
-//! what stops a large radius from looking like a uniform grey wash. It is
-//! generated once, at pass creation, and never changes.
-//!
-//! ## Why it is applied in the composite pass
+//! Samples lie in the unit hemisphere about +Z, scaled so later ones cluster near
+//! the origin, which stops a large radius from reading as a uniform grey wash. The
+//! kernel is generated once at pass creation and never changes.
 //!
 //! The graph refuses a pass that reads and writes one resource
 //! (`ErrorKind::PassStateConflict`, `compiler.rs:154-171`), so an AO pass cannot
-//! modulate the colour target it just read. The occlusion texture is multiplied
-//! in during composition instead, which also means the AO texture never has to
-//! be a second full-resolution colour target.
+//! modulate the colour target it just read. The occlusion texture is multiplied in
+//! during composition instead, which also avoids a second full-resolution colour
+//! target.
 
 use bytemuck::{Pod, Zeroable};
 use chassis::{BindGroup, CommandList, PassScope, Pipeline};
 
-/// Samples per pixel, as the C++'s GLSL-era AO passes used.
+/// Samples per pixel.
 pub const KERNEL_SIZE: usize = 64;
 
 /// Bind group number within the SSAO shader.
@@ -43,8 +32,8 @@ pub struct SsaoUniforms {
 
 const _: () = assert!(std::mem::size_of::<SsaoUniforms>().is_multiple_of(16));
 
-/// The C++-scale defaults: a 0.5 m radius, a small depth bias, and a contrast
-/// exponent that turns the raw fraction into something that reads as shading.
+/// Sensible defaults: a 0.5 m radius, a small depth bias, and a contrast exponent
+/// that turns the raw fraction into something that reads as shading.
 pub const DEFAULT_RADIUS: f32 = 0.5;
 pub const DEFAULT_BIAS: f32 = 0.025;
 pub const DEFAULT_POWER: f32 = 2.0;
@@ -69,9 +58,8 @@ impl SsaoUniforms {
 
 /// A hemisphere kernel, deterministic for a given seed.
 ///
-/// `deterministic` is the whole point: a kernel that changes per run cannot be
-/// compared against a reference image, and the C++'s AO never got far enough to
-/// have that problem. No `rand` dependency for six lines of xorshift.
+/// Determinism lets a frame be compared against a reference image; no `rand`
+/// dependency for six lines of xorshift.
 pub fn kernel(size: usize, seed: u64) -> Vec<[f32; 4]> {
     let mut state = seed | 1;
     let mut random = move || {

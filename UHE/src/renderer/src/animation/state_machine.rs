@@ -1,15 +1,15 @@
-//! Animation state machine, ported from `Renderer3D/AnimationStateMachine.h/.cpp`.
+//! Animation state machine.
 //!
 //! Conditions are data: a parameter name, a comparison operator and the value to
 //! compare against, so a transition is authored, not coded. The machine owns no
-//! animator and touches no scene — `update` returns the state it moved to and the
-//! caller applies the pose, which is what keeps the machine usable from a test.
+//! animator and touches no scene; `update` returns the state it moved to and the
+//! caller applies the pose, which keeps the machine usable from a test.
 
 use std::collections::HashMap;
 
 use crate::animation::clip::LoopMode;
 
-/// A parameter's value. Port of `AnimationStateMachine::ParameterValue`.
+/// A parameter's value.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Parameter {
     Bool(bool),
@@ -111,7 +111,7 @@ impl StateChange {
     }
 }
 
-/// Port of `AnimationStateMachine`.
+/// Animation state machine: states, transitions and the parameters they read.
 #[derive(Debug, Default)]
 pub struct AnimationStateMachine {
     parameters: HashMap<String, Parameter>,

@@ -3,12 +3,10 @@
 //! Two producers write this type and neither owns it. `msdf-atlas-gen` bakes an
 //! atlas ahead of time and writes a JSON next to the PNG it packs, which
 //! [`parse`](Atlas::parse) reads; [`crate::font::generate`] rasterizes a TTF at
-//! startup, which is what the C++ did in-process. Both end at
-//! [`assemble`](Atlas::assemble), so `layout` cannot tell which one produced the
-//! atlas — the coordinate convention is one, not two.
+//! startup. Both end at [`assemble`](Atlas::assemble), so `layout` cannot tell
+//! which one produced the atlas; the coordinate convention is one, not two.
 //!
-//! The JSON field names are the ones `msdf-atlas-gen` emits, unchanged, so an
-//! atlas the C++ editor produced loads without being re-baked.
+//! The JSON field names are the ones `msdf-atlas-gen` emits, unchanged.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -16,13 +14,13 @@ use std::fmt;
 use glam::Vec2;
 use vault::Image;
 
-/// One glyph. The counterpart of `FontGlyph` (`UHE/src/UHE/Renderer/Font.h:16`).
+/// One glyph.
 ///
-/// `plane_bounds_*` is the quad in em units — what the JSON calls `planeBounds`
-/// — and `uv_*` is the same quad in the atlas, normalized, y down from the top
-/// of the image. The two are not in the same scale: `layout` divides the plane
-/// box by one line height, because that is how the C++ normalized a line to 1.0
-/// (`Renderer2D.cpp:463`) and a second unit would be a second source of truth.
+/// `plane_bounds_*` is the quad in em units (the JSON's `planeBounds`) and `uv_*`
+/// is the same quad in the atlas, normalized, y down from the top of the image.
+/// The two are not in the same scale: `layout` divides the plane box by one line
+/// height, which makes one line 1.0 and keeps a second unit from being a second
+/// source of truth.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Glyph {
     pub unicode: u32,
@@ -41,7 +39,7 @@ pub struct Metrics {
     pub ascender: f32,
     pub descender: f32,
     /// How far the signed distance field spreads, in pixels. Zero means the
-    /// atlas is not a distance field at all — see [`Atlas::is_msdf`].
+    /// atlas is not a distance field at all; see [`Atlas::is_msdf`].
     pub distance_range: f32,
 }
 
@@ -120,9 +118,8 @@ impl Atlas {
         for glyph in &raw.glyphs {
             let plane = glyph.plane_bounds.unwrap_or_default();
             let atlas = glyph.atlas_bounds.unwrap_or_default();
-            // A whitespace glyph has bounds in neither space; zero-sized is what
-            // `getQuadPlaneBounds` gave the C++ for it, and its advance is still
-            // real, so it is kept rather than dropped.
+            // A whitespace glyph has bounds in neither space; zero-sized is kept
+            // because its advance is still real.
             glyphs.push(Glyph {
                 unicode: glyph.unicode,
                 advance: glyph.advance,
@@ -233,9 +230,8 @@ impl Atlas {
         &self.glyphs[0]
     }
 
-    /// Exact glyph, or the fallback. The C++ dropped an unknown character
-    /// (`Renderer2D.cpp:504-506`), which silently shortens the run; a wrong glyph
-    /// in the right place is what a caller can act on.
+    /// Exact glyph, or the fallback. Dropping an unknown character would silently
+    /// shorten the run; a wrong glyph in the right place is what a caller can act on.
     pub fn glyph_or_fallback(&self, codepoint: u32) -> &Glyph {
         self.glyph(codepoint).unwrap_or_else(|| self.fallback())
     }
@@ -244,8 +240,7 @@ impl Atlas {
         self.kerning.get(&(first, second)).copied().unwrap_or(0.0)
     }
 
-    /// Em units to layout units. One line height is 1.0, exactly as the C++
-    /// `DrawString` scaled (`Renderer2D.cpp:463`).
+    /// Em units to layout units. One line height is 1.0.
     pub fn scale(&self) -> f32 {
         if self.metrics.line_height > 0.0 {
             1.0 / self.metrics.line_height
@@ -261,8 +256,7 @@ impl Atlas {
     }
 }
 
-/// What `Font.cpp:23` passed to the packer, and what the shader assumed when the
-/// JSON did not carry it (`Text.slang` hardcoded `float2(2.0, 2.0)`).
+/// Distance range assumed when the atlas JSON does not carry one.
 const DEFAULT_DISTANCE_RANGE: f32 = 2.0;
 
 #[derive(serde::Deserialize)]
