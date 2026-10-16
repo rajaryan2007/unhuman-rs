@@ -18,8 +18,17 @@ Terse, and only what the code cannot say.
 - Tags, so an editor and `rg` can find them:
   - `TODO:` work not done
   - `FIXME:` known broken
-  - `SAFETY:` why the `unsafe` block is sound
+  - `XXX:` a hazard, or code that needs attention before it is touched
+  - `HACK:` a workaround that is not the right fix
+  - `BUG:` a known defect, ideally with a pointer to it
   - `NOTE:` a constraint that is not obvious from the code
+  - `SAFETY:` why the `unsafe` block is sound
+- Doc comments (`///`, `//!`): the first line is the brief, a one-sentence
+  present-tense summary, then the rest if it earns its place. Rustdoc does not
+  parse the Doxygen forms, so spell them the Rust way: `@brief` is that first
+  line, `@param` is a `# Arguments` section, `@return` is `# Returns`,
+  `@throws` is `# Errors` or `# Panics`, `@deprecated` is `#[deprecated]`, and
+  `@see` is a `[link]` in the prose.
 
 ## Commits
 
