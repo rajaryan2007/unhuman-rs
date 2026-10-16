@@ -1,5 +1,4 @@
-//! The outliner: tree shape, expansion, filtering, rename, and the drop rule
-//! the C++ panel got wrong once.
+//! The outliner: tree shape, expansion, filtering, rename, and the drop rule.
 
 use meats::{Entity, Scene};
 use mirror::hierarchy::Hierarchy;

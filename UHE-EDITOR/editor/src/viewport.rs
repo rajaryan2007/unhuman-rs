@@ -1,22 +1,18 @@
 //! The center viewport.
 //!
-//! ## Why there is no engine image here
-//!
 //! The editor window belongs to gpui, so the engine is built headless
 //! (`engine::create_gpu_from_process` hands back `WgpuGpu::headless`, and
 //! `chassis::Gpu::swapchain()` is `None` by design). The renderer records its
-//! frame through `chassis::Gpu::record_frame` — that part works — but the RHI has
-//! **no readback**: `chassis::Resources` creates and destroys resources and never
-//! hands pixels to the CPU, so the image the engine drew cannot reach this panel.
+//! frame through `chassis::Gpu::record_frame`, but the RHI has no readback:
+//! `chassis::Resources` never hands pixels to the CPU, so the image the engine
+//! drew cannot reach this panel.
 //!
-//! So the viewport draws the theme background and says what is missing. It does
-//! **not** draw an image, and it has no image to overlay a gizmo on: a stored RGBA
-//! buffer here would be a claim about pixels nothing can hand over.
+//! So the viewport draws the theme background and says what is missing. A stored
+//! RGBA buffer here would be a claim about pixels nothing can hand over.
 //!
 //! What would change it: an `Image`/readback in `chassis`, or gpui owning the
-//! surface the frame is presented to. Either one and this file gains the frame —
-//! extent plus RGBA8 — and `panels::viewport` draws it instead of the text.
-//! Nothing else changes; the panel is already the only caller.
+//! surface the frame is presented to. Then this file gains the frame (extent plus
+//! RGBA8) and `panels::viewport` draws it instead of the text.
 
 /// Shown in the middle of the viewport, in place of an image.
 pub const MISSING_FRAME_REASON: &str =
@@ -37,7 +33,7 @@ pub fn frame_time_label(frame_ms: f32) -> String {
     format!("{frame_ms:.2} ms")
 }
 
-/// `wgpu · 60.0 fps · 16.61 ms` — one line, in the status bar.
+/// Backend, fps and frame time as one line for the status bar.
 pub fn frame_status(backend: Option<&str>, fps: f32, frame_ms: f32) -> String {
     format!(
         "{} · {} · {}",

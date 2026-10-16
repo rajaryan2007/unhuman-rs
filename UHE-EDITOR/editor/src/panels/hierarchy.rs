@@ -1,12 +1,8 @@
 //! The left panel: the entity tree.
 //!
-//! The C++ `SceneHierachyPanel::DrawEntityNode` drew one ImGui tree node per
-//! entity with the tag as its label, the selected row in `ImGuiCol_Header` under
-//! an accent tint, and a context menu holding "Create Empty Entity", "Unparent to
-//! Root" and "Delete Entity". The tree, the selection and the expansion state are
-//! `mirror::hierarchy`'s; the two actions that need a selected entity live in the
-//! inspector, beside the entity they act on, because gpui has no built-in
-//! per-item context menu.
+//! The tree, the selection and the expansion are `mirror::hierarchy`'s. The two
+//! actions that need a selected entity live in the inspector, beside the entity
+//! they act on, because gpui has no built-in per-item context menu.
 
 use gpui::{div, prelude::*, px, AnyElement, ClickEvent, Context, IntoElement};
 use meats::{Entity, Scene};

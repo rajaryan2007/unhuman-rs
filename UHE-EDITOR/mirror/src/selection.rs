@@ -1,7 +1,5 @@
-//! What the editor has selected and what the pointer is over. Kept in one
-//! place because the outliner, the viewport and the inspector all read it, and
-//! the C++ scattered it across `m_SelectionContext`, `m_HoverdEntity` and a
-//! per-viewport pick.
+//! What the editor has selected and what the pointer is over. Kept in one place
+//! because the outliner, the viewport and the inspector all read it.
 
 use meats::Entity;
 
@@ -24,8 +22,7 @@ impl Selection {
         self.hovered = entity;
     }
 
-    /// Dropping a selection that is no longer in the scene, which the C++
-    /// pointer-hover path did by rebuilding the handle every frame.
+    /// Drops a selection that is no longer in the scene.
     pub fn clear(&mut self) {
         self.selected = None;
         self.hovered = None;

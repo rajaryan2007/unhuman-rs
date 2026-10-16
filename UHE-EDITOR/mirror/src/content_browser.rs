@@ -23,7 +23,7 @@ impl Entry {
 }
 
 /// What a drag out of the browser carries: the asset's virtual path, which is
-/// what `vault::Assets::load` takes. The C++ payload was a raw absolute path.
+/// what `vault::Assets::load` takes.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DragPayload {
     pub path: String,
@@ -56,9 +56,8 @@ impl ContentBrowser {
         }
     }
 
-    /// Adds a directory to the search path. A directory already mounted is not
-    /// mounted twice, and a path that is not a directory is ignored: the C++
-    /// tree had exactly one root and died on a missing one.
+    /// Adds a directory to the search path. An already-mounted directory is not
+    /// mounted twice, and a path that is not a directory is ignored.
     pub fn mount(&mut self, dir: PathBuf) {
         if dir.is_dir() && !self.roots.contains(&dir) {
             self.roots.push(dir);
@@ -132,8 +131,7 @@ impl ContentBrowser {
         crumbs
     }
 
-    /// Only descends into a mounted root; the C++ panel could walk anywhere the
-    /// process could read.
+    /// Only descends into a mounted root, never anywhere the process can read.
     pub fn navigate(&mut self, dir: &Path) -> bool {
         if !dir.is_dir() || !self.roots.iter().any(|root| dir.starts_with(root)) {
             return false;

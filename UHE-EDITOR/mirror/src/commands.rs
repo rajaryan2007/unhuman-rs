@@ -1,6 +1,5 @@
 //! The edit history: a small command enum, a bounded undo stack, and the
-//! inverses. The C++ editor had none of this, so every mistake in it was
-//! permanent.
+//! inverses.
 
 use std::collections::VecDeque;
 
@@ -88,11 +87,11 @@ impl Command {
     }
 
     /// Puts the scene back. Undoing a destroy rebuilds the entity, its name and
-    /// its parent: the components it held were dropped with it.
+    /// its parent.
     ///
-    /// shortcut: a destroyed entity's components do not come back, because
-    /// `meats` has no per-entity snapshot to rebuild them from; add one and
-    /// this inverse becomes exact.
+    /// NOTE: a destroyed entity's components do not come back, because `meats`
+    /// has no per-entity snapshot to rebuild them from; add one and this inverse
+    /// becomes exact.
     pub fn revert(&mut self, scene: &mut Scene, inspector: &mut Inspector) {
         match self {
             Command::CreateEntity { entity, .. } => scene.destroy(*entity),

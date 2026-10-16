@@ -1,15 +1,13 @@
 //! The properties panel's model: a `Vec<Property>` per selected entity, built
 //! by hand.
 //!
-//! The C++ walked ImGui's `DrawComponents<T>` template once per component type
-//! and read the fields directly. A `dyn Any`/reflection layer would cost a type
-//! lookup per property per frame, so each property is a getter and a setter
-//! closure over the concrete component instead, and the panel draws whatever
-//! the list says.
+//! A `dyn Any`/reflection layer would cost a type lookup per property per frame,
+//! so each property is a getter and a setter closure over the concrete component
+//! instead, and the panel draws whatever the list says.
 //!
 //! Nothing here constructs a `vault::AssetId`: the registry issues those. An
-//! asset-backed component exposes its `*_path` as the editable property and
-//! keeps the handle as state the scene owns.
+//! asset-backed component exposes its `*_path` as the editable property and keeps
+//! the handle as state the scene owns.
 
 use glam::{Vec2, Vec3, Vec4};
 use meats::{
@@ -1061,7 +1059,7 @@ fn collider_properties() -> Vec<Property> {
             },
             |scene, entity, value| {
                 edit::<Collider>(scene, entity, |collider| {
-                    // The C++ defaults for a freshly added collider.
+                    // Defaults for a freshly added collider.
                     collider.shape = match value {
                         1 => ColliderShape::Sphere { radius: 0.5 },
                         2 => ColliderShape::Capsule {

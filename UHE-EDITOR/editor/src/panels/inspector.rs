@@ -1,16 +1,14 @@
 //! The right panel: the components of the selected entity.
 //!
-//! The C++ `SceneHierarchyPanel::DrawComponents` walked the selected entity's
-//! components, drew each as a collapsing header, and gave every field a control —
-//! `DragFloat` with coloured X/Y/Z buttons for the vectors, `ColorEdit4` for
-//! colors, checkboxes for the booleans. `mirror::inspector` owns the component
-//! table and the read/write closures; this draws its `Property` list and writes
-//! back through `Editor::set_property`.
+//! Each component of the selected entity is a collapsing header with a control
+//! per field. `mirror::inspector` owns the component table and the read/write
+//! closures; this draws its `Property` list and writes back through
+//! `Editor::set_property`.
 //!
 //! Three controls live here rather than in `mirror`, because they need a toolkit:
 //! booleans toggle on click, an enum advances to its next variant, and a color
 //! shows its swatch. A float has no editor: gpui has no drag-number widget, so the
-//! value is shown the way the C++ formatted it and is not editable.
+//! value is shown as text and is not editable.
 
 use gpui::{div, prelude::*, px, AnyElement, ClickEvent, Context, IntoElement, Rgba, SharedString};
 use meats::{Entity, Scene};
@@ -251,8 +249,7 @@ pub fn enum_label(variants: &'static [&'static str], value: &PropertyValue) -> S
     format_value(value)
 }
 
-/// The value as text, in the precision the C++ controls used: `%.2f` for floats,
-/// the raw integer, `true`/`false`.
+/// The value as text: two decimals for floats, the raw integer, `true`/`false`.
 pub fn format_value(value: &PropertyValue) -> String {
     match value {
         PropertyValue::Bool(value) => {

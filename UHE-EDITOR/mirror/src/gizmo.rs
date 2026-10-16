@@ -1,7 +1,7 @@
 //! Transform-gizmo math: axis picking and dragging in screen space against an
-//! editor camera. Pure `glam`, no renderer and no toolkit — the panel measures
-//! the gizmo against the same view/projection the renderer draws the scene
-//! with, so what is picked is what is on screen.
+//! editor camera. Pure `glam`, no renderer and no toolkit: the panel measures the
+//! gizmo against the same view/projection the renderer draws the scene with, so
+//! what is picked is what is on screen.
 //!
 //! Mirror does not depend on `bifrost`, so the camera is three matrices here
 //! rather than `bifrost::EditorCamera`.
@@ -68,8 +68,7 @@ impl Axis {
     }
 }
 
-/// The C++ panel held Ctrl to snap: 0.5 for translate and scale, 45 degrees for
-/// rotate.
+/// Snap steps: 0.5 for translate and scale, 45 degrees for rotate.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Snap {
     pub enabled: bool,
@@ -145,7 +144,7 @@ impl GizmoTransform {
         scale: Vec3::ONE,
     };
 
-    /// Local axes: the C++ called `ImGuizmo::Manipulate` with `LOCAL`.
+    /// The transform's local axis, not the world's.
     pub fn axis(&self, axis: Axis) -> Vec3 {
         (self.rotation * axis.unit()).normalize_or_zero()
     }
@@ -198,10 +197,9 @@ impl TransformGizmo {
     }
 
     /// Nearest axis whose projected arrow passes within `PICK_RADIUS` of the
-    /// cursor. Picking follows the target's own axes, because the gizmo does
-    /// (`LOCAL` in the C++): a rotated entity's X is not the world's X. An axis
-    /// pointing at the camera projects to a point and cannot be picked, which
-    /// is the same thing the user sees.
+    /// cursor. Picking follows the target's own axes, so a rotated entity's X is
+    /// not the world's X. An axis pointing at the camera projects to a point and
+    /// cannot be picked, which is what the user sees.
     pub fn pick_axis(cam: &Camera, target: &GizmoTransform, mouse: Vec2) -> Option<Axis> {
         let origin_screen = cam.project(target.translation)?;
         let mut best: Option<(f32, Axis)> = None;

@@ -2,9 +2,7 @@
 //!
 //! A panel does not own state: it reads `mirror::Editor` and the engine's scene
 //! for the frame and writes back only through `mirror`'s methods, from the gpui
-//! callbacks it installs. That is the same split `ImGuiLayer.cpp` had — the panels
-//! drew from `Scene`/`Editor` and mutated through it — with the toolkit's
-//! retained widgets in place of ImGui's immediate mode.
+//! callbacks it installs. The toolkit's retained widgets replace immediate mode.
 
 pub mod content_browser;
 pub mod hierarchy;

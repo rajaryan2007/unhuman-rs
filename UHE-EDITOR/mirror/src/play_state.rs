@@ -1,9 +1,8 @@
 //! Stopped / playing / paused, and the snapshot that makes stopping safe.
 //!
-//! The C++ toolbar swapped in a `Scene::Copy` for play and threw it away on
-//! stop, so anything the running scene changed was lost *and* anything the user
-//! changed while playing was lost with it. The snapshot here is the authored
-//! scene: play runs on a copy, and stop puts the copy back.
+//! The snapshot is the authored scene: play runs on a copy, and stop puts the
+//! copy back. Without it a stop would lose anything the running scene changed and
+//! anything the user changed while playing.
 
 use meats::Scene;
 

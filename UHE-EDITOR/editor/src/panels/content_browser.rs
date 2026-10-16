@@ -1,15 +1,11 @@
 //! The bottom panel: the asset tree.
 //!
-//! The C++ `ContentBrowserPanel::OnImGuiRender` was a two-column table — a
-//! directory tree on the left, a thumbnail grid of the current directory on the
-//! right, with a breadcrumb trail of "back" buttons. `mirror::content_browser`
-//! owns the root, the current directory, the filter and the selection; this draws
-//! the breadcrumbs, the entries and the navigation.
+//! `mirror::content_browser` owns the root, the current directory, the filter and
+//! the selection; this draws the breadcrumbs, the entries and the navigation.
 //!
-//! The thumbnails are names, not pictures: previews went through
-//! `Texture2D::Create` on a decoded PNG, and gpui's image elements load through
+//! The thumbnails are names, not pictures: gpui's image elements load through
 //! gpui's own asset cache, not `vault`. The filter box is a label for the same
-//! reason — gpui has no text input widget in this crate, only the text renderer.
+//! reason: gpui has no text input widget in this crate, only the text renderer.
 
 use gpui::{div, prelude::*, px, ClickEvent, Context, IntoElement, SharedString};
 use mirror::content_browser::Entry;

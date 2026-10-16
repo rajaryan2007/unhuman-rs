@@ -1,11 +1,10 @@
 //! The editor binary: gpui over `mirror`'s model.
 //!
-//! This replaces `UHE/src/UHE/ImGui/ImGuiLayer.cpp` and `UHE_EDITOR/src`'s ImGui
-//! panels. The model those panels read is `mirror`'s; the engine loop they drove
-//! is `adam`'s, advanced from gpui's frame callback (`app::next_frame`). The layout
-//! is fixed — a resizable hierarchy on the left, viewport in the middle, inspector
-//! on the right, content browser below, toolbar above and status bar under it.
-//! Docking and floating windows are not ported.
+//! The panels read `mirror`'s model; the engine loop they drive is `adam`'s,
+//! advanced from gpui's frame callback (`app::next_frame`). The layout is fixed:
+//! a resizable hierarchy on the left, viewport in the middle, inspector on the
+//! right, content browser below, toolbar above and status bar under it. Docking
+//! and floating windows are not implemented.
 
 mod app;
 mod panels;

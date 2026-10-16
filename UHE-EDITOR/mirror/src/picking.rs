@@ -1,14 +1,12 @@
 //! CPU picking: a cursor into a ray, and a ray into the scene.
 //!
-//! The C++ editor rendered an `EntityID` target and read the pixel back. The
-//! port has no integer colour target in `chassis::TextureFormat` and no
-//! map/read-back path in the RHI, and a readback was only ever an approximation
-//! of the ray test — so picking is arithmetic here and needs no surface, no
+//! The RHI has no integer colour target in `chassis::TextureFormat` and no
+//! map/read-back path, so picking is arithmetic here and needs no surface, no
 //! GPU, and no frame in flight.
 //!
-//! Bounds are `vault::MeshData`'s own (`bounds_min`/`bounds_max`, folded from
-//! the positions by the loader), and each is tested in the mesh's *local*
-//! space, which is both tighter and cheaper than a world-space box.
+//! Bounds are `vault::MeshData`'s own (`bounds_min`/`bounds_max`, folded from the
+//! positions by the loader), and each is tested in the mesh's *local* space, which
+//! is both tighter and cheaper than a world-space box.
 
 use glam::{Mat4, Vec3, Vec4};
 use meats::{Entity, Scene};

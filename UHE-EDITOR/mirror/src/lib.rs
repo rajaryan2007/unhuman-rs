@@ -1,14 +1,13 @@
 //! The editor model: the outliner, the property panel, the content browser,
 //! the theme, the gizmo, the play state and the undo history.
 //!
-//! Toolkit-agnostic on purpose. The C++ editor was an ImGui layer, so its panel
-//! state could only exist inside a frame; here the state is a plain struct and
-//! the gpui binary is one renderer of it. Nothing in this crate names a UI
-//! library, draws a widget, or opens a window.
+//! Toolkit-agnostic on purpose: the state is a plain struct and any UI binary is
+//! one renderer of it. Nothing in this crate names a UI library, draws a widget,
+//! or opens a window.
 //!
 //! `Editor` holds no scene reference. Every call that needs the scene takes
-//! `&meats::Scene` or `&mut meats::Scene`, which is what keeps the editor out
-//! of the engine's ownership and lets a headless run construct the same model.
+//! `&meats::Scene` or `&mut meats::Scene`, which keeps the editor out of the
+//! engine's ownership and lets a headless run build the same model.
 
 pub mod commands;
 pub mod content_browser;
@@ -40,8 +39,8 @@ use commands::set_tag;
 use gizmo::TransformGizmo;
 use hierarchy::{is_within_subtree, tag_name};
 
-/// Frame timings for the status bar. The C++ read them straight out of
-/// `ImGui::GetIO()`, which is a toolkit's counter and not the engine's.
+/// Frame timings for the status bar, measured by the engine's own tick rather
+/// than a toolkit counter.
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub struct Stats {
     pub frame_ms: f32,
@@ -114,9 +113,8 @@ impl Editor {
     }
 
     /// Picks the entity under a ray: the nearest mesh whose bounds it crosses,
-    /// or nothing. A hit selects, a miss clears the selection, and the result
-    /// is the new hover either way. The C++ did this with an `EntityID` render
-    /// target and a pixel readback; see [`picking`].
+    /// or nothing. A hit selects, a miss clears the selection, and the result is
+    /// the new hover either way. See [`picking`].
     pub fn pick(&mut self, scene: &Scene, assets: &vault::Assets, ray: Ray) -> Option<Entity> {
         let hit = picking::pick(scene, assets, ray);
         self.selection.hover(hit);
@@ -213,8 +211,7 @@ impl Editor {
     }
 
     /// Destroys the entity and its subtree. A selection inside that subtree is
-    /// dropped first: the C++ panel kept it and the properties panel then drew
-    /// a dangling handle.
+    /// dropped first, so the properties panel cannot draw a dangling handle.
     pub fn destroy_entity(&mut self, scene: &mut Scene, entity: Entity) {
         let parent = scene.parent(entity);
         let name = tag_name(scene, entity);
@@ -292,9 +289,9 @@ impl Editor {
     /// Writes a drag's world transform back into the selected entity's local
     /// `Transform`, through its parent, and records what changed.
     ///
-    /// The gizmo works in world space so a nested entity still lines up with
-    /// what is on screen; the C++ panel undid that with the inverse of the
-    /// parent's world transform, and `Transform` stores euler degrees.
+    /// The gizmo works in world space so a nested entity still lines up with what
+    /// is on screen; this multiplies by the inverse of the parent's world
+    /// transform, and `Transform` stores euler degrees.
     pub fn apply_gizmo(&mut self, scene: &mut Scene, target: &GizmoTransform) -> bool {
         let Some(entity) = self.selection.selected else {
             return false;
@@ -305,9 +302,9 @@ impl Editor {
             let value = match (property.component, property.name) {
                 ("Transform", "Translation") => PropertyValue::Vec3(local.translation.to_array()),
                 ("Transform", "Rotation") => {
-                    // The component's quaternion is the C++ `glm::quat(vec3)`,
-                    // which is `Rz*Ry*Rx`: glam's `EulerRot::XYZEx`, not the
-                    // `XYZ` anyone reaches for. The inverse is `meats`' to own.
+                    // The component's quaternion is `Rz*Ry*Rx`: glam's
+                    // `EulerRot::XYZEx`, not the `XYZ` anyone reaches for. The
+                    // inverse is `meats`' to own.
                     PropertyValue::Vec3(meats::euler_degrees(local.rotation).to_array())
                 }
                 ("Transform", "Scale") => PropertyValue::Vec3(local.scale.to_array()),
@@ -418,7 +415,6 @@ pub fn gizmo_target(scene: &Scene, entity: Entity) -> GizmoTransform {
     }
 }
 
-/// The C++ `Scene::CreateEntity("Empty Entity")`.
 const EMPTY_ENTITY: &str = "Empty Entity";
 
 pub struct MirrorPlugin {

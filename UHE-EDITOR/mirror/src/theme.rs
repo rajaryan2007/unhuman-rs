@@ -1,6 +1,6 @@
-//! The editor palette: the C++ `EditorTheme.cpp` table, its persisted
-//! selection, and the derived colors panels draw with. The ImGui style it
-//! wrote into is a UI toolkit's problem, so only the values survive here.
+//! The editor palette: the theme table, its persisted selection, and the derived
+//! colors panels draw with. Only the values live here; the toolkit's style is its
+//! own concern.
 
 use std::fmt;
 use std::io;
@@ -238,7 +238,7 @@ const THEMES: [ThemeDef; ThemeId::COUNT] = [
     },
 ];
 
-/// Every value the C++ namespace exposed as an accessor.
+/// Every color and flag a theme exposes.
 #[derive(Clone, Copy, Debug)]
 pub struct Palette {
     pub accent: Rgba,
@@ -259,8 +259,7 @@ pub struct Palette {
     pub light: bool,
 }
 
-/// Where the persisted selection lives, beside the asset root. The C++ wrote
-/// it next to the process's working directory.
+/// Where the persisted selection lives, beside the asset root.
 pub const DEFAULT_PATH: &str = "assets/themes/editor_theme.ini";
 
 #[derive(Clone, Copy, PartialEq, Debug)]

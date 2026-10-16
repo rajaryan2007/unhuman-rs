@@ -1,11 +1,9 @@
 //! The outliner's model: the tree under a `meats::Scene`, which rows are open,
 //! what the filter hides, and which drops are legal.
 //!
-//! The C++ panel keyed expansion by entity UUID and validated a parent/child
-//! pair by asking the child for its parent. Here the tree is walked downwards
-//! from the roots, so a stale child entry cannot draw a second row, and a drop
-//! is refused when the target is inside the dragged subtree — the case the C++
-//! panel allowed once, producing a cycle.
+//! The tree is walked downwards from the roots, so a stale child entry cannot
+//! draw a second row, and a drop is refused when the target is inside the dragged
+//! subtree, which would make a cycle.
 
 use std::collections::HashSet;
 
@@ -141,8 +139,8 @@ impl Hierarchy {
         self.set_expanded(entity, !expanded);
     }
 
-    /// Drops expansion state and any rename in flight; the C++ panel did this
-    /// when the panel was pointed at a different scene.
+    /// Drops expansion state and any rename in flight, for when the panel is
+    /// pointed at a different scene.
     pub fn reset(&mut self) {
         self.expanded.clear();
         self.renaming = None;

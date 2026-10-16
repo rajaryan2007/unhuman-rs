@@ -1,16 +1,15 @@
 //! `mirror`'s palette, mapped into gpui colors.
 //!
-//! `mirror::theme` owns the palette and the theme list — the port of
-//! `EditorTheme.cpp`. This is only the conversion, plus the handful of derived
-//! tones the panels need and the C++ got from the ImGui style table
-//! (`ImGuiLayer::SetDarkThemeColor`): panel background, border, row hover.
+//! `mirror::theme` owns the palette and the theme list. This is only the
+//! conversion, plus the derived tones the panels need: panel background, border,
+//! row hover.
 
 use gpui::Hsla;
 use mirror::theme::{Palette, Rgba, Theme};
 
 /// Every color one frame of the editor draws with.
 ///
-/// Only what a ported panel draws: the console colors and the title bar are in
+/// Only what the panels draw: the console colors and the title bar stay in
 /// `mirror`'s palette for a console and a titled window this binary has none of.
 #[derive(Clone, Copy, Debug)]
 pub struct EditorTheme {

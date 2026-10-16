@@ -1,15 +1,13 @@
 //! The editor application: the gpui root view, the layout, and the single place
 //! the engine loop is advanced.
 //!
-//! ## One thread, one loop
-//!
 //! The engine frame and the gpui frame are the same frame. gpui owns the main
-//! thread — its platform run loop calls back into this view for every drawn frame
-//! — and the engine is advanced from that callback (`next_frame`), so there is no
-//! second thread, no channel, and no lock between the model the panels read and
-//! the scene the engine writes. That is only possible because this is the *only*
-//! owner of both: `adam::App` and `mirror::Editor` are fields of one struct, and
-//! `Engine`'s data is never borrowed by two of them at once.
+//! thread and calls back into this view for every drawn frame; the engine is
+//! advanced from that callback (`next_frame`), so no second thread, channel, or
+//! lock sits between the model the panels read and the scene the engine writes.
+//! That holds because this struct is the only owner of both: `adam::App` and
+//! `mirror::Editor` are fields of one struct, and `Engine`'s data is never
+//! borrowed by two of them at once.
 //!
 //! The engine is built headless, because the window is gpui's. See
 //! `crate::viewport` for what that leaves the viewport showing.
@@ -102,17 +100,14 @@ impl EditorApp {
     /// One engine frame: the editor's play state decides how much simulation
     /// runs, then `adam::App` runs it.
     ///
-    /// The delta comes from the engine's own clock (`Time::delta`, the interval
-    /// the last frame was ticked with), so there is one clock and not two.
+    /// The delta comes from the engine's own clock (`Time::delta`), so there is
+    /// one clock and not two.
     ///
-    /// `Time::scale` is what makes pause mean pause. `mirror::PlayState` reports
-    /// the seconds this frame should simulate — `0.0` when paused or stopped, one
-    /// fixed step after `step_once` — and a scale of zero keeps those seconds out
-    /// of the fixed-step accumulator, so pausing freezes the simulation instead of
-    /// queueing a catch-up burst, while the render half of the frame keeps
-    /// running. `mirror` emits whole fixed steps and `adam` consumes whole fixed
-    /// steps from the seconds it is handed, so the substep count stays the
-    /// engine's decision.
+    /// `Time::scale` is what makes pause mean pause: `mirror::PlayState` reports
+    /// the seconds to simulate (zero when paused or stopped, one fixed step after
+    /// `step_once`), and a scale of zero keeps those seconds out of the
+    /// fixed-step accumulator, so pausing freezes the simulation instead of
+    /// queueing a catch-up burst while the render half keeps running.
     fn advance_frame(&mut self) {
         let delta = self.engine.engine().time.delta().as_secs_f32();
         let scene = &mut self.engine.engine_mut().scene;
@@ -266,10 +261,10 @@ impl EditorApp {
             .child(self.theme_source.name())
     }
 
-    /// A drag handle. The bar itself only starts the drag; the move and release
-    /// listeners live in its `canvas` paint callback, which is the one place gpui
-    /// lets a view register a window-level mouse listener — an element's own
-    /// `on_mouse_move` stops firing the moment the pointer leaves the 5px bar.
+    /// A drag handle. The bar starts the drag; the move and release listeners
+    /// live in its `canvas` paint callback, the one place gpui lets a view
+    /// register a window-level mouse listener. An element's own `on_mouse_move`
+    /// stops firing once the pointer leaves the 5px bar.
     fn splitter(&self, splitter: Splitter, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme;
         let dragging = self
