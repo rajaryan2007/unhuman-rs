@@ -256,6 +256,15 @@ impl DrawArena {
     ) -> Result<usize, chassis::Error> {
         self.destroy(resources);
 
+        if blocks.is_empty() {
+            // A frame with nothing to draw has no per-draw blocks, and a buffer
+            // of zero bytes is nothing a backend will accept: the first frame of
+            // an empty scene hit exactly that and failed the whole frame. No
+            // blocks, no buffer, no groups -- the callers draw nothing.
+            self.stride = 0;
+            return Ok(0);
+        }
+
         let stride = align_up(
             blocks
                 .iter()

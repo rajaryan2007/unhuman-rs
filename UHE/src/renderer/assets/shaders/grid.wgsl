@@ -8,9 +8,12 @@
 // Two differences from the Slang original, both forced:
 //   * the two matrices arrived as push constants, which this RHI cannot declare,
 //     so they are a uniform block;
-//   * `SV_Depth` has no WGSL spelling on the output (`@builtin(frag_depth)` does,
-//     and is what is used), so the fragment still writes the real 3D depth and
-//     the grid is occluded by geometry correctly.
+//   * the grid pass has no depth attachment here (see `PipelineKey::grid`), so
+//     the fragment returns colour alone. `SV_Depth` cannot be written without
+//     one, and a pipeline whose shader writes `@builtin(frag_depth)` against a
+//     pass with no depth is rejected outright -- which is exactly how the editor
+//     failed to open at all. The grid blends over the scene instead of being
+//     depth-occluded, and the distance fade does the work `SV_Depth` did.
 
 struct Grid {
     view_projection: mat4x4<f32>,
@@ -55,8 +58,6 @@ fn vs_main(@builtin(vertex_index) index: u32) -> VertexOutput {
 
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
-    // Grid.slang's `SV_Depth`.
-    @builtin(frag_depth) depth: f32,
 };
 
 @fragment
@@ -98,8 +99,6 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
         discard;
     }
 
-    let clip = grid.view_projection * vec4<f32>(frag_pos, 1.0);
     out.color = color;
-    out.depth = clip.z / clip.w;
     return out;
 }
