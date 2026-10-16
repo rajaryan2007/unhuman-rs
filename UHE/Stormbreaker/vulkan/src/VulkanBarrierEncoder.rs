@@ -5,11 +5,10 @@
 //! device's `SyncTier`. There is no second path: a pass cannot hand-write a
 //! barrier, because `chassis::CommandList` has no barrier method at all.
 //!
-//! That is the whole reason the C++ engine has two owners of synchronization.
-//! `VulkanCommandBuffer::BeginRenderPass` writes its own barriers
-//! (`VulkanCommandBuffer.cpp:104,153`) while the graph synthesizes others, and
-//! the two are reconciled by a boolean handshake
-//! (`MarkSwapchainRenderedByLegacy`, `VulkanDevice.h:82`).
+//! Two owners of synchronization cannot agree reliably: a pass writing its own
+//! barriers while the graph synthesizes others needs a handshake to reconcile
+//! them, and the handshake is where a hazard slips through. One lowering point
+//! removes that class of bug.
 
 use ash::vk;
 use chassis::graph::types::{BufferBarrier, ImageBarrier};
@@ -108,7 +107,7 @@ pub fn buffer_barrier_legacy(
 /// builder. Nothing here borrows, so `'static` is accurate.
 ///
 /// Split out from recording so the lowering is testable with no command buffer,
-/// no device and no driver — these are plain structs.
+/// no device and no driver; these are plain structs.
 pub fn image_barrier2(
     target: Target,
     barrier: ImageBarrier,

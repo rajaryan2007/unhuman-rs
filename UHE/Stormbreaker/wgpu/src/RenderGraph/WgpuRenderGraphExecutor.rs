@@ -3,9 +3,8 @@
 //! ## Why this lives in `RenderGraph/`
 //!
 //! Because the Vulkan backend puts its executor there, and a reader who knows
-//! where to look in one backend should not have to go looking in the other. The
-//! C++ engine has `Vulkan/RenderGraph/VulkanRenderGraphExecutor.{h,cpp}`; this is
-//! the same file for the same reason.
+//! where to look in one backend should not have to go looking in the other. Both
+//! backends keep their executor in a `RenderGraph/` directory.
 //!
 //! ## What is the same and what is not
 //!

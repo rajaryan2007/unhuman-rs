@@ -4,9 +4,7 @@
 //!
 //! The graph speaks in handles: `chassis::Texture`, `chassis::Buffer`. Vulkan
 //! wants `vk::Image`, `vk::ImageView`, `vk::Buffer`. Something has to hold the
-//! pairing for the duration of a frame, and the C++ engine puts it in
-//! `VulkanRenderGraphResources.{h,cpp}` with `RegisterTexture` / `RegisterBuffer`
-//! / `ClearRegistrations` / `ResolveView` / `ResolveBuffer` / `ResolveExtent`.
+//! pairing for the duration of a frame; this table does, keyed by handle.
 //!
 //! ## `ClearRegistrations` is not an optimisation
 //!
@@ -116,8 +114,6 @@ impl FrameRegistrations {
     /// slot pointing at nothing is one error reported before a single
     /// `vkBeginCommandBuffer` -- rather than a failure on whichever worker
     /// happened to reach that pass, which would name a thread and not a handle.
-    ///
-    /// The C++ engine does this too, and calls the result an `RGResolvedFrame`.
     pub fn resolve_frame(
         &self,
         slots: &SlotTable,

@@ -2,8 +2,7 @@
 //!
 //! ## Status
 //!
-//! No code. `chassis::Gpu` renders with dynamic rendering on Vulkan and wgpu
-//! equivalents the attachments directly to the pass, so neither backend has a
-//! framebuffer object. The file exists in C++ because C++ uses a render pass
-//! object; the Rust port uses dynamic rendering / implicit attachments on both
-//! sides and has no equivalent.
+//! No code. `chassis::Gpu` renders with dynamic rendering on Vulkan and binds the
+//! attachments directly to the pass on wgpu, so neither backend needs a
+//! framebuffer object: both use dynamic rendering / implicit attachments and have
+//! no equivalent.

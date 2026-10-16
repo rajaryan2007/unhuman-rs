@@ -1,10 +1,8 @@
 //! Device capability detection and sync tier selection.
 //!
-//! Ported from `UHE/src/Platform/Vulkan/VulkanExtensionCheck.h`. That design is
-//! correct and worth keeping verbatim: capability detection is
-//! core-promotion-aware, so an extension promoted into Vulkan 1.3 counts even
-//! when the instance never enumerated it, and every barrier and submit goes
-//! through one lowering point that picks the modern or legacy encoding from the
+//! Detection is core-promotion-aware, so an extension promoted into Vulkan 1.3
+//! counts even when the instance never enumerated it. Every barrier and submit
+//! lowers through one point that picks the modern or legacy encoding from the
 //! resulting tier.
 //!
 //! `select_sync_tier` is a pure function, so the tier ladder is testable with no
@@ -66,11 +64,8 @@ pub struct QueueFamily {
 ///
 /// ## Why this is an object and not a function
 ///
-/// `VulkanPhysicalDevice::has_device_extension` calls
-/// `vkEnumerateDeviceExtensionProperties` on *every* question. It was asked
-/// eight times during one device creation -- once per capability, plus three
-/// again in logical device setup -- so eight driver round-trips where the C++
-/// engine does one.
+/// A per-question `vkEnumerateDeviceExtensionProperties` call meant eight driver
+/// round-trips during one device creation, where a single cache needs one.
 ///
 /// That is not just slow. `has_device_extension` answers "is this string
 /// present", which is the wrong question for any extension promoted into core:

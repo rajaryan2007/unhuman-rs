@@ -1,7 +1,5 @@
 //! Swapchain.
 //!
-//! Mirrors `VulkanSwapChain.cpp`.
-//!
 //! Takes an existing `VkSurfaceKHR` rather than creating one. That matters
 //! because ash has no generic `vkCreateSurface`: surface creation is
 //! platform-specific (wayland, xlib, win32, android) and belongs to `eyes`, the
@@ -9,8 +7,8 @@
 //!
 //! For tests there is `create_headless_surface`, using `VK_EXT_headless_surface`,
 //! which the driver reports on any machine with a real ICD. That means the
-//! swapchain path — present modes, format selection, out-of-date handling,
-//! acquire and present — is testable with no window at all, which is also what
+//! swapchain path -- present modes, format selection, out-of-date handling,
+//! acquire and present -- is testable with no window at all, which is also what
 //! the headless robotics mode needs.
 
 use ash::{vk, Instance};
@@ -119,7 +117,7 @@ impl Swapchain {
     /// Builds a swapchain against a surface the caller keeps.
     ///
     /// Prefer [`Swapchain::new_owning_surface`]. This exists for the case where
-    /// something else -- a window system — really does own the surface and
+    /// something else -- a window system -- really does own the surface and
     /// outlives the swapchain.
     pub fn new(
         entry: &ash::Entry,
@@ -378,7 +376,7 @@ impl Swapchain {
         })
     }
 
-    /// True when the surface has no current size — minimised, or not yet shown.
+    /// True when the surface has no current size -- minimised, or not yet shown.
     pub fn is_minimised(&self) -> bool {
         self.extent.0 == 0 || self.extent.1 == 0
     }
@@ -607,15 +605,12 @@ fn choose_format(formats: &[vk::SurfaceFormatKHR]) -> Result<vk::Format> {
         })
 }
 
-/// The `chassis` format for a chosen Vulkan surface format, so a caller does not
-/// have to hold both enums.
 /// The swapchain's format as a `chassis` one.
 ///
-/// A re-export, not a second mapping. There were two: this one and
-/// `VulkanTypes::from_vk_format`, each with its own subset of formats, and they
-/// disagreed -- a `D32_SFLOAT` swapchain reported a depth format here and `None`
-/// there. Three copies is how a swapchain ends up one format away from the
-/// pipeline's.
+/// A re-export, not a second mapping. Two mappings with different format
+/// coverage disagreed -- a `D32_SFLOAT` swapchain reported a depth format from
+/// one and `None` from the other -- which is how a swapchain ends up one format
+/// away from its pipeline.
 pub use crate::vulkan_types::from_vk_format as chassis_format;
 
 #[cfg(test)]
@@ -742,10 +737,9 @@ mod tests {
             chassis_format(vk::Format::B8G8R8A8_SRGB),
             Some(TextureFormat::Bgra8Srgb)
         );
-        // Was `None`, because `chassis_format` and `VulkanTypes::from_vk_format`
-        // were two mappings with different coverage and this one was the shorter.
-        // Consolidated onto the longer one, so a surface asking for an RGBA32F
-        // image now resolves instead of failing.
+        // Two mappings with different coverage used to disagree here; consolidated
+        // onto the longer one, so an RGBA32F surface format now resolves instead of
+        // failing.
         assert_eq!(
             chassis_format(vk::Format::R32G32B32A32_SFLOAT),
             Some(TextureFormat::Rgba32Float)

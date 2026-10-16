@@ -14,7 +14,7 @@ fn arguments(values: &[&str]) -> Vec<String> {
     values.iter().map(|v| (*v).to_owned()).collect()
 }
 
-// ── selection ───────────────────────────────────────────────────────────────
+// -- selection
 
 /// wgpu is the default.
 ///
@@ -122,7 +122,7 @@ fn unrelated_arguments_are_left_alone() {
     );
 }
 
-// ── the trait object ────────────────────────────────────────────────────────
+// -- the trait object
 
 fn open_gpu() -> Option<WgpuGpu> {
     if Adapter::request(0).is_none() {

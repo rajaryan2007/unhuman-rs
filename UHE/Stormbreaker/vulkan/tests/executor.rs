@@ -617,7 +617,7 @@ fn a_null_slot_cannot_resolve_a_barrier_target() {
     );
 }
 
-// ── the pixels ──────────────────────────────────────────────────────────────
+// the pixels
 
 /// The one that matters: not that a draw was recorded, but that the triangle is
 /// in the image when it comes back.

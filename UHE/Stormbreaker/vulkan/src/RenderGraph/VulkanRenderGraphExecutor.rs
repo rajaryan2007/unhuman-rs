@@ -1,11 +1,9 @@
 //! Executes a compiled frame: one command list per pass, recorded in parallel,
 //! submitted in compiled order.
 //!
-//! Ported from `UHE/src/Platform/Vulkan/RenderGraph/VulkanRenderGraphExecutor.cpp`.
-//! The C++ executor owns a mutex, one `VkCommandBuffer` and one binary semaphore,
-//! and records every pass into that single buffer inside
-//! `VK_PIPELINE_STAGE_ALL_COMMANDS_BIT` barriers (`VulkanRenderGraphExecutor.cpp:79-150`).
-//! That is correct and it is serial: one buffer means one thread.
+//! One command list per pass, so one recording thread per pass. A single shared
+//! buffer would force recording onto one thread; here recording is parallel and
+//! only submission is serial.
 //!
 //! ## The two decisions that make this different
 //!
@@ -26,8 +24,8 @@
 //! Every pass records its own `pre_barriers` and `post_barriers` into its own
 //! command list. That is what keeps a list self-contained: list `i` can be
 //! recorded on thread `i` with no knowledge of any other list, because the
-//! transitions it needs are the ones it declared. The C++ wraps a *range* of
-//! passes in one buffer and emits a barrier at the range boundary, which is
+//! transitions it needs are the ones it declared. Wrapping a *range* of passes
+//! in one buffer would emit barriers only at the range boundary, which is
 //! exactly the structure that cannot be parallel.
 
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -294,8 +292,8 @@ impl VulkanRenderGraphExecutor {
         //
         // A slot pointing at nothing is then one error, reported on this thread,
         // naming a handle -- rather than a failure on whichever worker reached
-        // that pass, naming a thread. The C++ engine separates these into
-        // `Resolve` and `Record` for the same reason.
+        // that pass, naming a thread. Resolve is separated from record for the
+        // same reason.
         self.registrations.clear();
         {
             let textures = scope_resources.textures.read().expect("registry lock");

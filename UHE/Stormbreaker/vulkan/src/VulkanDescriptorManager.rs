@@ -1,7 +1,7 @@
 //! Descriptor management.
 //!
-//! Mirrors `VulkanDescriptorManager.cpp`. Owns the layouts, the pools and the
-//! sets, and is the only entry point the rest of the backend uses:
+//! Owns the layouts, the pools and the sets, and is the only entry point the
+//! rest of the backend uses:
 //!
 //! ```text
 //!   vulkan_descriptor_set.rs    DescriptorKind, DescriptorSet, writes
@@ -9,16 +9,13 @@
 //!   this file                   caching, lifetime, and the mapping to chassis
 //! ```
 //!
-//! Two things the C++ version does not have:
+//! Two deliberate properties:
 //!
 //! * **Layouts are cached by a structural hash**, so two identical requests share
-//!   one `VkDescriptorSetLayout`. The C++ allocates a layout per bind group, and
-//!   `VulkanDescriptorManager.cpp:90,94,113` is reached through the
-//!   `g_VulkanContext` global besides.
-//! * **Sets are per-pass and bound at an index.** The C++ binds a global set on
-//!   every `BindPipeline` (`VulkanCommandBuffer.cpp:370-375`), which its own
-//!   `docs/framegraph-and-rendergraph.md:57` flags. Here there is no global to
-//!   bind, so the failure mode has no representation.
+//!   one `VkDescriptorSetLayout` instead of allocating a layout per bind group.
+//! * **Sets are per-pass and bound at an index.** There is no global set, so the
+//!   failure mode where every `BindPipeline` rebinds one process-wide set has no
+//!   representation.
 
 use std::collections::HashMap;
 

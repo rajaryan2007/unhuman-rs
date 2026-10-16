@@ -1,26 +1,14 @@
 //! Per-thread command list recording and graph-ordered submission.
 //!
-//! Mirrors `VulkanFrameContext.cpp`. This is the orchestrator: it owns the
-//! per-list pools from `command_pool.rs`, hands out buffers wrapped as
-//! `vulkan_command_buffer::Recording`, and turns a batch of finished recordings into a
-//! submission through `submit_encoder.rs`.
+//! This is the orchestrator: it owns the per-list pools from `command_pool.rs`,
+//! hands out buffers wrapped as `vulkan_command_buffer::Recording`, and turns a
+//! batch of finished recordings into a submission through `submit_encoder.rs`.
 //!
-//! The recording model is the part the C++ engine cannot express.
-//! `VulkanCommandBuffer` owns one primary buffer for the whole frame, and
-//! `VulkanDevice::EndFrameGraph` chains every pass to its predecessor to work
-//! around it:
-//!
-//! ```cpp
-//! // VulkanDevice.cpp:630-637 — forces total order
-//! for (pass : orderedPasses)
-//!     if (previous) pass.dependencies.push_back(previous);
-//!     previous = pass;
-//! ```
-//!
-//! The comment there admits it defeats the DAG until per-thread command pools
-//! exist. Here every worker owns a pool and a buffer, records in parallel with no
-//! lock, and submission walks the *compiled* order afterwards. Recording is
-//! parallel; submission is not, which is exactly what Vulkan requires.
+//! Recording is parallel and submission is serial, which is what Vulkan
+//! requires: every worker owns a pool and a buffer and records with no lock, and
+//! submission then walks the *compiled* order. The spec's external-sync object
+//! for recording is the pool, not the buffer, so one pool per worker makes
+//! concurrent recording sound.
 
 use ash::{vk, Device};
 
@@ -267,7 +255,7 @@ impl Recorder {
     }
 
     /// True when the chain rides one timeline semaphore rather than one binary
-    /// semaphore per link. Diagnostics only — callers do not branch on it.
+    /// semaphore per link. Diagnostics only; callers do not branch on it.
     pub fn uses_timeline(&self) -> bool {
         self.timeline.is_some()
     }

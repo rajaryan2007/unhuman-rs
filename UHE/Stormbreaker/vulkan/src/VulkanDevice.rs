@@ -1,19 +1,9 @@
 //! Device creation.
 //!
-//! Mirrors `VulkanDevice.cpp`, reduced to the orchestration its C++ counterpart
-//! has. The work lives in the three files that correspond to its C++ siblings:
-//!
-//! | here | C++ |
-//! |---|---|
-//! | `vulkan_instance.rs` | `VulkanInstance.cpp` |
-//! | `vulkan_physical_device.rs` | `VulkanPhysicalDevice.cpp` |
-//! | `vulkan_logical_device.rs` | `VulkanLogicalDevice.cpp` |
-//! | `vulkan_context.rs` | `VulkanContext.h` — the global bag, now a value |
-//!
-//! What is left here is the sequencing, plus the extension-name constants the
-//! three of them share. The C++ file is 500 lines of VulkanDevice plus a
-//! `Begin`/`End` frame that this engine keeps in `vulkan_frame_context.rs`,
-//! because a frame context is a different thing from a device.
+//! Orchestration only: the work lives in `vulkan_instance`,
+//! `vulkan_physical_device`, and `vulkan_logical_device`, and the extension-name
+//! constants they share are here. Frame begin/end is separate, in
+//! `vulkan_frame_context.rs`, because a frame context is not a device.
 
 use std::ffi::CStr;
 
@@ -47,12 +37,10 @@ impl DeviceOptions {
         self
     }
 
-    /// Honours `UHE_VALIDATION=1`, mirroring how the C++ engine gates its
-    /// sanitizer framework (`CMakeLists.txt:32-174`).
+    /// Honours `UHE_VALIDATION=1`.
     ///
-    /// Worth having on by default for tests: it found four real bugs in this
-    /// backend that `cargo test` alone could not see, including a command pool
-    /// shared across threads and a timeline value that did not increase.
+    /// Worth having on in tests: the layer catches ordering and lifetime bugs
+    /// that `cargo test` alone cannot see.
     pub fn from_env(engine_name: &'static CStr) -> Self {
         let validation = std::env::var("UHE_VALIDATION")
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
@@ -73,11 +61,9 @@ pub fn create_device(options: DeviceOptions) -> Result<crate::vulkan_context::Co
 
     // **Once**, here, and handed down.
     //
-    // This used to be `vkEnumerateDeviceExtensionProperties` called once per
-    // capability -- eight times during one device creation. The C++ engine
-    // enumerates once into a `VulkanExtensionCheck` and answers named questions
-    // off the cache, and the queries are core-promotion-aware there in a way the
-    // string check here was not.
+    // A per-capability `vkEnumerateDeviceExtensionProperties` call meant eight
+    // driver round-trips during one device creation. `ExtensionCheck` answers
+    // named, core-promotion-aware queries off the cache instead.
     let check = crate::vulkan_extension_check::ExtensionCheck::probe(
         instance,
         physical_device,

@@ -1,10 +1,7 @@
 //! Barrier lowering, tested with no device, no driver and no loader.
 //!
-//! This is the payoff of `stormgraph` emitting backend-neutral barriers: the
-//! whole Vulkan encoding path is exercisable here. In the C++ engine the
-//! equivalent code lives in `VulkanBarrierEncoder.cpp`, reachable only through
-//! `tests/rendergraph`, which has to compile 11 backend sources plus a
-//! `VmaDispatchStub` to get at it.
+//! `stormgraph` emits backend-neutral barriers, so the whole Vulkan encoding path
+//! is exercisable without a driver.
 
 use ash::vk;
 use ash::vk::Handle;
@@ -15,7 +12,7 @@ use stormbreaker::{
 };
 
 /// A handle that was never allocated. Nothing here dispatches, so a dangling
-/// pointer is fine — the structs under test never reach a driver.
+/// pointer is fine: the structs under test never reach a driver.
 fn fake_image() -> vk::Image {
     vk::Image::from_raw(0x1000)
 }
@@ -84,8 +81,8 @@ fn every_state_maps_to_a_layout() {
 
 #[test]
 fn combined_depth_stencil_uses_the_combined_layout() {
-    // A stencil aspect with DEPTH_ATTACHMENT_OPTIMAL is a validation error, and
-    // this is the format coupling the C++ descriptors hide.
+    // A stencil aspect with DEPTH_ATTACHMENT_OPTIMAL is a validation error, so
+    // the combined format needs the combined layout.
     assert_eq!(
         vulkan_types::layout_for(ImageState::DepthAttachment, TextureFormat::Depth24Stencil8),
         vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL

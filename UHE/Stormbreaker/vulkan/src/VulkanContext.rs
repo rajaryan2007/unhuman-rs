@@ -1,16 +1,8 @@
 //! Device context.
 //!
-//! This is the C++ `VulkanContext` global bag (`VulkanContext.h:56`:
-//! `extern VulkanContext* g_VulkanContext`), turned into an owned value with a
-//! real lifetime. The C++ version is dereferenced from
-//! `VulkanUtils.cpp:15,56,65,82,123,141,207,253`, `VulkanTexture.cpp:20,138,271`,
-//! `VulkanFramebuffer.cpp:10` and `VulkanDescriptorManager.cpp:90,94,113` —
-//! every helper reaching up to a process-wide handle for its own device. That is
-//! also why `VulkanCommandBuffer.cpp:79-85` has to `static_cast` a global back
-//! into a `VulkanDevice` it could already have reached through this struct.
-//!
-//! Here it is owned by the `Gpu` that owns it, borrowed as `&Context`, and
-//! dropped in a defined order.
+//! Everything one device owns, as a value with a real lifetime and one drop
+//! order, rather than a process-wide handle every helper reaches up to. The
+//! `Gpu` that owns it borrows it as `&Context`.
 
 use ash::{vk, Device, Entry, Instance};
 

@@ -1,13 +1,8 @@
 //! Descriptor sets.
 //!
-//! Mirrors `VulkanDescriptorSet.cpp`.
-//!
-//! The C++ engine binds a **global** descriptor set on every `BindPipeline`
-//! (`VulkanCommandBuffer.cpp:370-375`), which its own
-//! `docs/framegraph-and-rendergraph.md:57` lists as a known problem. The fix is
-//! structural: sets live here, are bound at an explicit set index by
-//! `vulkan_command_buffer`, and there is no global. Nothing to port, because there
-//! is nothing to carry over.
+//! Sets live here and are bound at an explicit set index by
+//! `vulkan_command_buffer`. There is no global set, so the failure mode where a
+//! `BindPipeline` rebinds one process-wide set has no representation.
 
 use ash::vk;
 

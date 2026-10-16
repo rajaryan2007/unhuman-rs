@@ -20,12 +20,12 @@ use stormglass::{WgpuError, WgpuGpu, WgpuSurface};
 
 use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, PresentMode, TextureFormat as WgpuFormat};
 
-// ── format, present mode, alpha mode ────────────────────────────────────────
+// -- format, present mode, alpha mode
 
-/// The C++ `chooseSwapSurfaceFormat` preference, against wgpu's vocabulary.
+/// The sRGB BGRA preference, against wgpu's vocabulary.
 ///
 /// BGRA8 sRGB rather than the surface's first format: it is the one both APIs
-/// guarantee, and the C++ asks for `B8G8R8A8_SRGB` for the same reason.
+/// guarantee.
 #[test]
 fn nothing_requested_prefers_srgb_bgra() {
     let formats = [WgpuFormat::Rgba8Unorm, WgpuFormat::Bgra8UnormSrgb];
@@ -33,8 +33,7 @@ fn nothing_requested_prefers_srgb_bgra() {
     assert_eq!(chosen, WgpuFormat::Bgra8UnormSrgb);
 }
 
-/// The surface's own first format when it offers no sRGB BGRA at all, which is the
-/// C++'s `availableFormats[0]` fallback.
+/// The surface's own first format when it offers no sRGB BGRA at all.
 #[test]
 fn a_surface_without_srgb_bgra_keeps_its_own_order() {
     let formats = [WgpuFormat::Rgba8UnormSrgb, WgpuFormat::Bgra8Unorm];
@@ -79,7 +78,7 @@ fn a_surface_with_no_formats_reports_itself_incompatible() {
     assert_eq!(error, WgpuError::IncompatibleSurface);
 }
 
-/// Mailbox when offered, fifo otherwise -- the C++ `chooseSwapPresentMode`.
+/// Mailbox when offered, fifo otherwise.
 #[test]
 fn mailbox_is_preferred_and_fifo_is_the_floor() {
     let both = [PresentMode::Fifo, PresentMode::Mailbox];
@@ -107,7 +106,7 @@ fn a_requested_present_mode_the_surface_does_not_offer_is_an_error() {
     assert_eq!(chosen, PresentMode::Mailbox);
 }
 
-/// The C++ passes `COMPOSITE_ALPHA_OPAQUE`; wgpu guarantees `Opaque` or `Inherit`.
+/// The opaque alpha mode when offered; wgpu guarantees `Opaque` or `Inherit`.
 #[test]
 fn opaque_is_preferred_and_a_contradictory_list_still_answers() {
     let both = [CompositeAlphaMode::Inherit, CompositeAlphaMode::Opaque];
@@ -124,9 +123,9 @@ fn opaque_is_preferred_and_a_contradictory_list_still_answers() {
     assert_eq!(choose_alpha_mode(&[]), CompositeAlphaMode::Auto);
 }
 
-// ── extent ──────────────────────────────────────────────────────────────────
+// -- extent
 
-/// The C++ `chooseSwapExtent` clamp, which wgpu's `configure` enforces by panicking.
+/// The extent clamp, which wgpu's `configure` enforces by panicking.
 ///
 /// A zero-sized window is what a minimised one reports, and it is the case that
 /// would panic: "`config.width` or `config.height` is zero" is in
@@ -149,7 +148,7 @@ fn a_zero_extent_is_clamped_rather_than_handed_to_configure() {
     );
 }
 
-/// A window larger than the device is letterboxed by the C++ and clamped here.
+/// A window larger than the device is clamped here.
 ///
 /// `validate_surface_configuration` refuses anything above
 /// `max_texture_dimension_2d`, so passing it through is a request the device cannot
@@ -190,9 +189,9 @@ fn an_extent_that_fits_is_unchanged() {
     );
 }
 
-// ── image count ─────────────────────────────────────────────────────────────
+// -- image count
 
-/// The C++ `chooseSwapMinImageCount`, and wgpu's spelling of it.
+/// Three images as a wgpu latency.
 ///
 /// Three images is latency 2, which is also wgpu's own default -- and the two
 /// functions have to stay inverses, or `Swapchain::image_count` reports a number
@@ -208,7 +207,7 @@ fn three_images_is_two_frames_of_latency() {
     assert_eq!(images_for(0), 1);
 }
 
-// ── acquire ─────────────────────────────────────────────────────────────────
+// -- acquire
 
 /// Every verdict wgpu can return, named without a device.
 ///
@@ -271,7 +270,7 @@ fn the_acquire_status_reads_as_a_message() {
     assert!(bridged.to_string().contains("surface"));
 }
 
-// ── the seam ────────────────────────────────────────────────────────────────
+// -- the seam
 
 /// Both the surface and the gpu are what the RHI asks for.
 ///
@@ -285,7 +284,7 @@ fn the_surface_and_the_gpu_are_the_rhi_swapchain() {
     takes::<WgpuGpu>();
 }
 
-// ── the graph adapter ───────────────────────────────────────────────────────
+// -- the graph adapter
 
 /// `add_pass` refuses rather than returning an id that names no pass.
 ///
@@ -334,7 +333,7 @@ fn a_refused_frame_does_not_poison_the_next_one() {
     assert_eq!(ids, vec![0]);
 }
 
-// ── record_frame ────────────────────────────────────────────────────────────
+// -- record_frame
 
 /// An empty frame: no passes, and so nothing it could need from a surface.
 fn empty_frame() -> CompiledGraph {
@@ -406,7 +405,7 @@ fn an_acquired_image_binds_the_slot_the_frame_names() {
     assert_eq!(slots.texture(slot), Some(image));
 }
 
-// ── the device ──────────────────────────────────────────────────────────────
+// -- the device
 
 /// Headless is `None` from `swapchain`, and says so.
 ///

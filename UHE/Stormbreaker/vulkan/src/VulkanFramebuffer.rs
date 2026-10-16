@@ -1,18 +1,14 @@
 //! Framebuffers.
 //!
-//! Mirrors `VulkanFramebuffer.cpp`.
-//!
 //! **Nearly empty under dynamic rendering, and that is the point.** A
 //! `VkFramebuffer` binds a set of attachments to a render pass, and
 //! `VkRenderPass` no longer exists in this backend. Attachment sets for a
 //! dynamic-rendering pass are described by `chassis::RenderPassDesc` at record
 //! time, so there is nothing left for a framebuffer object to do.
 //!
-//! The C++ engine has both a `VulkanRenderPass.cpp` and a `VulkanFramebuffer.cpp`
-//! while making dynamic rendering mandatory at `VulkanDevice.cpp:87-91`, which is
-//! how dead code accumulates. This file exists for parity and carries the
-//! compatibility path only: a framebuffer for a pass that renders *into* another
-//! pass's attachments, which dynamic rendering does not cover.
+//! This file carries the compatibility path only: a framebuffer for a pass that
+//! renders *into* another pass's attachments, which dynamic rendering does not
+//! cover.
 //!
 //! Nothing in this engine needs that yet, so the constructor is here, unused and
 //! honest, rather than called from a render path.

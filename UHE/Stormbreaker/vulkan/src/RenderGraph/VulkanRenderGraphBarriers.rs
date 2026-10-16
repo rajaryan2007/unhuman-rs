@@ -4,10 +4,10 @@
 //!
 //! `VulkanRenderGraphExecutor.rs` was one file holding the executor, the
 //! registration table, the barrier lowering and the scope opening -- 757 lines,
-//! none of which you could read without reading the rest. The C++ engine keeps
-//! these apart too, and for the same reason: barrier lowering is the only place
-//! that knows about both `vk::ImageMemoryBarrier` and `chassis::graph::ImageBarrier`
-//! at once, and it is where you go when a frame has a hazard.
+//! none of which you could read without reading the rest. Barrier lowering is
+//! the only place that knows about both `vk::ImageMemoryBarrier` and
+//! `chassis::graph::ImageBarrier` at once, and it is where you go when a frame
+//! has a hazard.
 //!
 //! ## Why barriers are not in the graph
 //!
@@ -22,9 +22,6 @@
 //! resource; deciding *which* resource a slot means belongs to
 //! `vulkan_render_graph_resources`. Doing it per barrier here would mean the
 //! same lookup twice per barrier, with two chances to disagree.
-//!
-//! Moved verbatim. A file split that also rewrites the bodies is two changes
-//! wearing one name, and the rewrite is the one that breaks.
 
 use ash::vk;
 use chassis::graph::pass::SlotTable;

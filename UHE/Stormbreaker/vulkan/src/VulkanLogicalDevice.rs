@@ -1,7 +1,5 @@
 //! Logical device creation.
 //!
-//! Mirrors `VulkanLogicalDevice.cpp`.
-//!
 //! Feature enabling mirrors the probe in `vulkan_physical_device.rs`, with the
 //! same constraint: the 1.2 node only appears on the chain when the device
 //! reported 1.2 or newer. Enabling a feature through a struct the device does not

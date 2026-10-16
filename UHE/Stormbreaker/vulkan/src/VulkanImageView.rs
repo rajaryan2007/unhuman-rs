@@ -1,14 +1,11 @@
 //! Image views.
 //!
-//! Mirrors `VulkanImageView.cpp`, split out of `vulkan_texture.rs` because the C++
-//! tree has both files and because the split is meaningful: an image is memory,
-//! a view is a *window onto* it, and the two have different lifetimes and
-//! different reasons to be recreated.
+//! Split from `vulkan_texture.rs` because the two have different lifetimes and
+//! reasons to be recreated: an image is memory, a view is a *window onto* it.
 //!
-//! `VulkanTexture.cpp` creates one view per image eagerly. So does this, through
-//! `create_default`, but a view can also be made separately for a subresource
-//! range or a cube face, which is what a shadow map and its comparison sampler
-//! need.
+//! `create_default` makes one view per image eagerly, but a view can also cover
+//! a subresource range, a mip, or a cube face, which is what a shadow map and its
+//! comparison sampler need.
 
 use ash::vk;
 

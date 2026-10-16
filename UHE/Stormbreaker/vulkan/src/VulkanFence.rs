@@ -1,12 +1,7 @@
 //! Host-side fences.
 //!
-//! Mirrors `VulkanFence.cpp` and `VulkanBinaryFence.cpp`.
-//!
-//! The C++ tree has two files that both define `VulkanBinarySemaphore`
-//! (`VulkanBinaryFence.h` and `VulkanBinarySemaphore.h`), which is an ODR
-//! violation — one of the things its own
-//! `docs/vulkan-sync-and-rendergraph.md:87-90` flags. There is one binary
-//! primitive here and it lives in `semaphore.rs`.
+//! One fence per frame in flight; the binary primitive shared with semaphores
+//! lives in `semaphore.rs`.
 
 use std::time::Duration;
 

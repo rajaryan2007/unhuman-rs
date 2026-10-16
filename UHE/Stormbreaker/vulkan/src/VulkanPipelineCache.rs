@@ -1,18 +1,17 @@
 //! The driver's pipeline cache.
 //!
-//! Mirrors `VulkanPipelineCache.cpp`. Separate from `Pipelines`, which decides
-//! *whether* to compile something, and from `shader.rs`, which owns SPIR-V
-//! modules. Three layers, three files, matching the C++ split.
+//! Separate from `Pipelines`, which decides *whether* to compile something, and
+//! from `shader.rs`, which owns SPIR-V modules. Three layers, three files.
 //!
 //! Two caches exist and they solve different problems:
 //!
-//! * This one asks the driver "have you already compiled this?" — it can still
+//! * This one asks the driver "have you already compiled this?", which can still
 //!   cost a `vkCreateGraphicsPipelines` call.
-//! * `Pipelines` asks *us* "is this the same description as last time?" — it
+//! * `Pipelines` asks *us* "is this the same description as last time?", which
 //!   avoids the call entirely.
 //!
-//! The C++ tree has the first kind only, which is why `VulkanPipelineState.cpp`
-//! recompiles on every request.
+//! The driver cache alone is not enough: it can miss and cost a full
+//! `vkCreateGraphicsPipelines`, which is why `Pipelines` caches descriptions.
 
 use ash::vk;
 

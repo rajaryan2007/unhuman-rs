@@ -295,7 +295,7 @@ fn the_pass_recorder_is_send_and_sync() {
     takes_recorder(&NoRecording);
 }
 
-// ── the swapchain image: the one slot the frontend cannot fill ──────────────
+// -- the swapchain image: the one slot the frontend cannot fill
 //
 // No device in any of these. The decision is a function of the compiled frame and
 // the handle the acquire produced, and both are plain data -- `chassis::graph::compile`
@@ -366,7 +366,7 @@ fn offscreen_frame() -> rg::CompiledGraph {
     graph.compile().expect("the frame compiles")
 }
 
-// ── the rule, which reads the compiled frame ────────────────────────────────
+// -- the rule, which reads the compiled frame
 
 /// The swapchain image is the resource that has to leave the frame presentable.
 ///

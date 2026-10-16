@@ -132,11 +132,9 @@ fn memory_properties_are_populated() {
 
 #[test]
 fn a_device_can_be_created_and_destroyed_repeatedly() {
-    // The C++ engine cannot run this test. `g_VulkanContext`
-    // (`VulkanContext.h:56`) and `Application::s_instance`
-    // (`Core/Application.h:50`) are process-wide, so a second device overwrites
-    // the first one's handle and the first one's destructor frees memory the
-    // second one now owns. Two live contexts must be independent.
+    // Two live contexts must be independent: a process-wide device handle would
+    // let a second context overwrite the first one's, and the first one's
+    // destructor would then free memory the second now owns.
     let (Some(first), Some(second)) = (open_device(), open_device()) else {
         return;
     };

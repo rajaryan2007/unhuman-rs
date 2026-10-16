@@ -1,25 +1,25 @@
 //! Pipeline description, hashing and the description cache.
 //!
-//! Mirrors `VulkanPipelineState.cpp`, which in the C++ tree holds both the state
-//! objects and the creation path. Split here:
+//! Holds the state objects, hash, description cache and lifetime. Creation is
+//! split out:
 //!
 //! ```text
 //!   vulkan_pipeline_state.rs    this file: description, hash, cache, lifetime
-//!   vulkan_graphic_pipeline.rs  VulkanGraphicPipeline.cpp
-//!   vulkan_compute_pipeline.rs  VulkanComputePipeline.cpp
-//!   vulkan_pipeline_cache.rs    VulkanPipelineCache.cpp, the driver's cache
+//!   vulkan_graphic_pipeline.rs  graphics pipeline creation
+//!   vulkan_compute_pipeline.rs  compute pipeline creation
+//!   vulkan_pipeline_cache.rs    the driver's pipeline cache
 //! ```
 //!
 //! Two caches exist and they solve different problems, which is why they are two
 //! files:
 //!
-//! * **This one** asks *us* "is this the same description as last time?" — it
+//! * **This one** asks *us* "is this the same description as last time?", which
 //!   avoids the `vkCreateGraphicsPipelines` call entirely.
 //! * `vulkan_pipeline_cache.rs` asks the *driver* "have you already compiled
-//!   this?" — it can still cost the call.
+//!   this?", which can still cost the call.
 //!
-//! The C++ tree has only the second kind, which is why
-//! `VulkanPipelineState.cpp` recompiles on every request.
+//! Only the driver cache exists without this file, and asking it "have you
+//! compiled this?" can miss, so every request would recompile.
 
 use std::collections::HashMap;
 

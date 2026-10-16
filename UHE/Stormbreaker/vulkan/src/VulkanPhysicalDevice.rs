@@ -1,7 +1,5 @@
 //! Physical device selection and capability probing.
 //!
-//! Mirrors `VulkanPhysicalDevice.cpp`.
-//!
 //! The probing rules here are the ones that are easy to get subtly wrong:
 //!
 //! * `synchronization2` and `dynamic_rendering` are only reachable through

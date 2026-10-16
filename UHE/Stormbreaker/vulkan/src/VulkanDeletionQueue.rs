@@ -1,12 +1,10 @@
 //! Deferred destruction.
 //!
-//! Mirrors `UHE/src/UHE/RHI/DeletionQueue.h` and the flush at
-//! `VulkanDevice.cpp:420`. Destroying a resource on the frame that releases it is
-//! wrong: an earlier frame may still reference it in a command buffer that has
-//! been recorded but not submitted. The C++ queue is a
-//! `std::vector<std::function<void()>>`; this is an explicit enum of what can be
-//! destroyed, so getting it wrong is a compile error rather than the wrong call
-//! on the wrong handle.
+//! Destroying a resource on the frame that releases it is wrong: an earlier frame
+//! may still reference it in a command buffer that has been recorded but not
+//! submitted. The queue holds an explicit enum of what can be destroyed, so
+//! getting it wrong is a compile error rather than the wrong call on the wrong
+//! handle.
 
 use std::collections::VecDeque;
 

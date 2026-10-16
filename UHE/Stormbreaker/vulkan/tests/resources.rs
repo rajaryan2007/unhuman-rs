@@ -2,9 +2,8 @@
 //!
 //! The interesting one is `parallel_recordings_submit_in_order`: it records two
 //! command lists on two threads and submits them as a semaphore chain, then
-//! checks the bytes that came out the far end. That is the property the C++
-//! engine cannot express — `VulkanDevice.cpp:630-637` linearises the graph
-//! because every pass shares one primary command buffer.
+//! checks the bytes that came out the far end. Two lists in flight at once is
+//! what a single shared primary command buffer per frame cannot express.
 
 use ash::vk;
 use chassis::{
@@ -331,7 +330,7 @@ fn parallel_recordings_submit_in_order() {
 
     // Each list is *moved* into its own thread. There is no shared command
     // buffer, no pool lock and no `&mut` aliasing between them: this is the
-    // recording model the C++ engine cannot express.
+    // recording model a shared primary command buffer cannot express.
     let finished = std::thread::scope(|scope| {
         let forward = scope.spawn(move || {
             first.copy_buffer_to_buffer(source_handle, device_handle, &[region]);

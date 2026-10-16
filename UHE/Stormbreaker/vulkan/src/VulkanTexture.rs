@@ -1,12 +1,8 @@
 //! Textures and image views.
 //!
-//! Mirrors `VulkanTexture.cpp` and `VulkanImageView.cpp`. Note what is *not*
-//! here: a layout field per texture. The C++ engine tracks layouts in the
-//! render graph and separately in `ImageState`, which is why
-//! `VulkanCommandBuffer.cpp:104,153` can disagree with the graph about what a
-//! texture's layout is. Here the graph is the only authority — the texture knows
-//! its format and extent, and transitions arrive as barriers it never has to
-//! reason about.
+//! A texture carries no layout field: the render graph is the only authority on
+//! image layout. The texture knows its format and extent, and transitions arrive
+//! as barriers it never has to reason about, so the two cannot disagree.
 
 use ash::vk;
 use chassis::{Extent, Registry, Texture, TextureDesc, TextureFormat, TextureUsage};
@@ -262,12 +258,9 @@ impl Drop for Textures {
         // Views first. A view must not outlive the image it views, and the
         // images are destroyed on the next line.
         //
-        // This was a leak I introduced: `create_view` pushes into `self.views`
-        // with a comment claiming the views die with their texture, which was
-        // true of the view inside a TextureResource and false of these. The RHI
-        // suite caught it as VUID-vkDestroyDevice-device-05137 naming a bare
-        // VkImageView -- an error about teardown that says nothing about which
-        // object, which is the only kind worth not having.
+        // A missed `create_view` view leaks a bare `VkImageView`, which validation
+        // reports only at teardown as VUID-vkDestroyDevice-device-05137, naming no
+        // object.
         for view in self.views.drain(..) {
             crate::vulkan_image_view::destroy(&self.device, view.handle());
         }

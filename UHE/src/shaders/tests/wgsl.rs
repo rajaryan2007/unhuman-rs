@@ -1,4 +1,4 @@
-//! WGSL → SPIR-V, end to end, with no device.
+//! WGSL to SPIR-V, end to end, with no device.
 
 use forge::wgsl;
 use forge::Stage;

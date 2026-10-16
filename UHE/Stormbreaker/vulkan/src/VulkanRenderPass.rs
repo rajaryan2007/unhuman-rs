@@ -1,18 +1,14 @@
 //! Legacy `VkRenderPass`, for hardware without dynamic rendering.
 //!
-//! Ported from `UHE/src/Platform/Vulkan/VulkanRenderPass.cpp`.
-//!
 //! ## Why this exists when the engine uses dynamic rendering everywhere
 //!
-//! The C++ carries it for one reason, stated in the header's own `\todo`: the
-//! dynamic-rendering render-pass builder was not finished, so old hardware had
-//! no fallback. `VulkanGraphicPipeline.cpp:176` passes `renderPass = nullptr`,
-//! which is correct for dynamic rendering, and `VulkanGraphicPipeline.h:49`
-//! holds a `m_FallbackRenderPass` for when it is not.
+//! Dynamic rendering is picked at device creation when the device supports it,
+//! so a 1.0 device has no fallback otherwise. This is the only path that works
+//! on such a device, and the escape hatch if a driver ships a broken
+//! dynamic-rendering implementation.
 //!
-//! So this is not dead code to be tidied away. It is the only path that works on
-//! a 1.0 device, this engine targets 1.1, and it is also the escape hatch if a
-//! driver turns out to ship a broken dynamic-rendering implementation.
+//! `VulkanGraphicPipeline` passes a null render pass, which is correct for
+//! dynamic rendering; this is what to build when it is not.
 //!
 //! ## What is not wired up yet
 //!
@@ -97,10 +93,8 @@ impl RenderPass {
         };
 
         // Struct literals, not builders: ash's builder for these sets the
-        // pointer and leaves the count at zero. That is the third time this has
-        // bitten -- `stage_count` segfaulted RADV, `dynamic_state_count` was a
-        // validation error -- and the pattern is consistent enough to be worth
-        // writing down rather than rediscovering.
+        // pointer and leaves the count at zero, so validation sees a count that
+        // disagrees with the pointer.
         let subpass = vk::SubpassDescription {
             pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
             color_attachment_count: colour_references.len() as u32,

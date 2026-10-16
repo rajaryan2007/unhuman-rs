@@ -1,4 +1,4 @@
-//! `chassis::Gpu` for wgpu — the first implementation of it in this project.
+//! `chassis::Gpu` for wgpu, the first implementation of it in this project.
 //!
 //! ## Why this file matters more than its size
 //!
@@ -6,7 +6,7 @@
 //! describe a seam, and a seam described and never implemented is a hope rather
 //! than an architecture. This is the first thing on the other side of it.
 //!
-//! Everything above it — the renderer, the editor, whatever comes after — reaches
+//! Everything above it (the renderer, the editor, whatever comes after) reaches
 //! the GPU through `dyn Gpu` and cannot tell this from the Vulkan one. When
 //! `VulkanGpu` exists, the two are chosen at startup and nothing above changes.
 //! That is the whole claim of a two-backend engine, and until this file compiled
@@ -28,14 +28,14 @@
 //! `add_dependency` first: the shared graph has no explicit edge list. Ordering
 //! comes from reads and writes, which is what makes a read-after-write hazard
 //! unrepresentable rather than merely discouraged. Accepting an edge the compiler
-//! would ignore would be worse than refusing it — a caller would believe something
+//! would ignore would be worse than refusing it, a caller would believe something
 //! the graph does not do.
 //!
 //! `add_pass` cannot be honoured faithfully either. A pass in the shared graph
 //! names its resources by id and by *state* (`ImageState`), which is what the
 //! compiler orders a frame from; a `RenderPassDesc` carries attachments as handles
-//! with a format and a load op and no state at all, its label may be empty — which
-//! the compiler refuses as an unnamed pass — and a resolve target has nowhere to
+//! with a format and a load op and no state at all, its label may be empty (which
+//! the compiler refuses as an unnamed pass), and a resolve target has nowhere to
 //! go. A pass declared from one would be ordered against states the caller never
 //! gave: a wrong frame, which is worse than a missing one.
 
@@ -165,7 +165,7 @@ impl WgpuGpu {
             max_texture_size,
             // One. wgpu orders submissions to a queue itself and gives back a
             // promise per submit, so more than one frame in flight is a real
-            // option here — and it is not wired. Claiming 2 here would be the
+            // option here, and it is not wired. Claiming 2 here would be the
             // same "one less than the truth" that the Vulkan backend's
             // `frames_in_flight: 1` deliberately is not.
             frames_in_flight: 1,

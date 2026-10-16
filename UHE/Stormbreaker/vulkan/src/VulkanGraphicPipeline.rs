@@ -1,15 +1,12 @@
 //! Graphics pipelines.
 //!
-//! Mirrors `VulkanGraphicPipeline.cpp`. The shared description, its structural
-//! hash and the pipeline cache live in `vulkan_pipeline_state.rs`; compute is in
-//! `vulkan_compute_pipeline.rs`.
+//! The shared description, its structural hash and the pipeline cache live in
+//! `vulkan_pipeline_state.rs`; compute is in `vulkan_compute_pipeline.rs`.
 //!
-//! Created through **dynamic rendering** (`VkPipelineRenderingCreateInfo`) rather
-//! than `VkRenderPass`. The C++ engine makes dynamic rendering a hard floor
-//! (`VulkanDevice.cpp:87-91`) while still carrying `VkRenderPass`-shaped
-//! attachments in its descriptors (`RHITypes.h:373-384`), so its render-pass
-//! objects are dead weight. Here `chassis::RenderPassDesc` *is* the rendering
-//! info and there is no render-pass object to create or destroy.
+//! Created through **dynamic rendering** (`VkPipelineRenderingCreateInfo`)
+//! rather than `VkRenderPass`. `chassis::RenderPassDesc` *is* the rendering info
+//! and there is no render-pass object to create or destroy, so there is no
+//! `VkRenderPass`-shaped attachment state to keep in sync with it.
 
 use ash::vk;
 use chassis::Pipeline;
@@ -59,7 +56,7 @@ fn build(
 
     // Every stage's module, as one array.
     //
-    // One note: Slang emits the entry point as `main` regardless of what it was
+    // NOTE: Slang emits the entry point as `main` regardless of what it was
     // called in source, so `p_name` is always `c"main"`. That is a property of
     // the compiler's output, not a convention this backend chose, and it is the
     // single most common reason a correctly compiled shader fails to create.

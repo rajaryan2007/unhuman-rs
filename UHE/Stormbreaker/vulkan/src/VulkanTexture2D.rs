@@ -1,14 +1,8 @@
 //! 2D textures.
 //!
-//! Mirrors `VulkanTexture2D.cpp`, which the C++ keeps separate from
-//! `VulkanTexture.cpp` because the engine's 2D renderer only ever wants a 2D
-//! image with one mip and one layer, and the C++ type papers over that.
-//!
-//! Here the split earns its keep differently: `vulkan_texture.rs` owns the image
-//! and its memory, and this file is the 2D-shaped convenience over it — the
-//! defaults `TextureDesc` needs spelled out, plus a clear color. A `VulkanTexture2D`
-//! equivalent that has to be constructed with a full `TextureDesc` is not saving
-//! anyone anything.
+//! `vulkan_texture.rs` owns the image and its memory; this file is the 2D-shaped
+//! convenience over it, spelling out the defaults a `TextureDesc` needs plus a
+//! clear color. A 2D renderer only ever wants one mip and one layer.
 
 use ash::vk;
 use chassis::{Extent, Texture, TextureFormat, TextureUsage};

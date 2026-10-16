@@ -1,22 +1,18 @@
 //! The command buffer: raw recording operations, and the `chassis::CommandList`
 //! adapter that resolves handles on top of them.
 //!
-//! Mirrors `VulkanCommandBuffer.cpp` — with one structural difference that is the
-//! point of the whole design. The C++ class owns *one* primary buffer for the
-//! entire frame, which is why `VulkanDevice::EndFrameGraph` chains every pass to
-//! its predecessor (`VulkanDevice.cpp:630-637`) and admits in a comment that this
-//! defeats the DAG. Here each worker records into its own buffer, so there is
-//! nothing to chain and the compiled order survives to the GPU.
+//! Each worker records into its own buffer, so passes need no chaining and the
+//! compiled order survives to the GPU. One shared primary buffer for the whole
+//! frame would serialise every pass to its predecessor and defeat the DAG.
 //!
 //! The buffer also has **no barrier API**. Barriers arrive pre-baked from the
-//! render graph, which is what makes the `MarkSwapchainRenderedByLegacy` style of
-//! handshake unnecessary.
+//! render graph, so no separate present-rendered handshake is needed.
 //!
 //! Two layers, deliberately:
 //!
-//! * [`Recording`] — raw Vulkan. Takes `vk::Pipeline`, `vk::Buffer`. No registry
+//! * [`Recording`]: raw Vulkan. Takes `vk::Pipeline`, `vk::Buffer`. No registry
 //!   lookups, no locking, nothing that could stall a worker thread.
-//! * [`CommandList`] — implements `chassis::CommandList`. Takes generational
+//! * [`CommandList`]: implements `chassis::CommandList`. Takes generational
 //!   handles and resolves them through the resource registries.
 //!
 //! The split exists so the hot path does no handle resolution. A pass recording
@@ -77,7 +73,7 @@ impl Recording {
         self.slot
     }
 
-    // ── rendering scope ────────────────────────────────────────────────────
+    // Rendering scope.
 
     /// Dynamic rendering. Attachments come from the graph's compiled pass, not
     /// from a `VkRenderPass`, which this backend has no concept of.
@@ -142,7 +138,7 @@ impl Recording {
         self.rendering = false;
     }
 
-    // ── state ──────────────────────────────────────────────────────────────
+    // State.
 
     pub fn set_viewport(&mut self, extent: vk::Extent2D) {
         let viewport = vk::Viewport {
@@ -172,13 +168,9 @@ impl Recording {
             self.device
                 .cmd_bind_pipeline(self.buffer, vk::PipelineBindPoint::GRAPHICS, pipeline)
         };
-        // Remembered, not discarded.
-        //
-        // `vkCmdBindDescriptorSets` takes the pipeline layout, and the only
-        // correct one is the layout of the pipeline that is currently bound. It
-        // was being dropped here and passed as `VK_NULL_HANDLE` at the bind, which
-        // is a validation error the moment anything binds a group -- and nothing
-        // bound one, so it had never been caught.
+        // Remembered, not discarded: `vkCmdBindDescriptorSets` must be given the
+        // layout of the currently bound pipeline, so binding a group against a
+        // null layout is a validation error.
         self.layout = layout;
     }
 
@@ -233,7 +225,7 @@ impl Recording {
         };
     }
 
-    // ── draws ──────────────────────────────────────────────────────────────
+    // Draws.
 
     pub fn draw(&mut self, vertices: u32, instances: u32) {
         unsafe { self.device.cmd_draw(self.buffer, vertices, instances, 0, 0) };
@@ -253,7 +245,7 @@ impl Recording {
         };
     }
 
-    // ── transfers ──────────────────────────────────────────────────────────
+    // Transfers.
 
     pub fn copy_buffer_to_buffer(
         &mut self,
@@ -264,10 +256,10 @@ impl Recording {
         unsafe { self.device.cmd_copy_buffer(self.buffer, src, dst, regions) };
     }
 
-    /// `copy_buffer_to_image` hardcodes `GENERAL`, which is only legal if the
-    /// image really is in `GENERAL` and it never is: the render graph puts images
-    /// in `TRANSFER_DST` or `SHADER_READ_ONLY`. Taking the layout is the fix, and
-    /// it belongs on both copies for the same reason.
+    /// The destination layout is taken explicitly: `GENERAL` is only legal when
+    /// the image really is in `GENERAL`, and the render graph puts images in
+    /// `TRANSFER_DST` or `SHADER_READ_ONLY`. The reverse copy takes the source
+    /// layout for the same reason.
     pub fn copy_buffer_to_image(
         &mut self,
         src: vk::Buffer,
@@ -311,7 +303,7 @@ impl Recording {
         };
     }
 
-    // ── barriers, lowered ──────────────────────────────────────────────────
+    // Barriers, lowered.
 
     pub fn barrier_image(&mut self, barriers: &[vk::ImageMemoryBarrier2<'static>]) {
         let dependency = vk::DependencyInfo::default()
@@ -477,9 +469,7 @@ impl chassis::CommandList for CommandList<'_> {
     }
 
     fn bind_group(&mut self, set: u32, group: &chassis::BindGroup) {
-        // The layout is the bound pipeline's, remembered by `bind_pipeline`. It
-        // was `VK_NULL_HANDLE` before, which is a validation error the instant
-        // anything actually binds -- and nothing bound, so nothing caught it.
+        // The layout is the bound pipeline's, remembered by `bind_pipeline`.
         let Some(handle) = self.descriptors.set(*group) else {
             // A stale handle. Panicking matches `resolve_buffer`: a bind against
             // a destroyed resource is a caller bug, and silently dropping the

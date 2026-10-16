@@ -1,13 +1,9 @@
 //! Descriptor pools.
 //!
-//! Mirrors `VulkanDescriptorPool.cpp`, one of the three files the C++ backend
-//! splits its descriptor handling across.
-//!
-//! A pool is the allocation source for sets; `vulkan_descriptor_set.rs` allocates
-//! from one. Sizes are derived from the layouts that have been requested so far,
-//! because a pool whose sizes do not cover the types in its sets fails
-//! `vkAllocateDescriptorSets` with `ERROR_OUT_OF_POOL_MEMORY` and no indication of
-//! which type was short.
+//! A pool is the allocation source for sets. Sizes are derived from the layouts
+//! requested so far, because a pool whose sizes do not cover the types in its
+//! sets fails `vkAllocateDescriptorSets` with `ERROR_OUT_OF_POOL_MEMORY` and no
+//! indication of which type was short.
 
 use std::collections::HashMap;
 

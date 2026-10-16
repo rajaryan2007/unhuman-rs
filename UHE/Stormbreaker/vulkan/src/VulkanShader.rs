@@ -1,9 +1,8 @@
 //! Shader modules.
 //!
-//! Mirrors `VulkanShader.cpp`. Modules are keyed by a content hash, so a shader
-//! whose source did not change is never recompiled or re-uploaded — an addition
-//! the C++ tree wanted and did not have. `forge` produces the SPIR-V and the
-//! hash; this file never parses shader source.
+//! Modules are keyed by a content hash, so a shader whose source did not change
+//! is never recompiled or re-uploaded. `forge` produces the SPIR-V and the hash;
+//! this file never parses shader source.
 //!
 //! The driver's own cache is `pipeline_cache.rs`, and the "have we compiled this
 //! description before" cache is in `pipeline.rs`. Three layers, three files.

@@ -1,10 +1,8 @@
 //! Backend-neutral enums mapped onto Vulkan values.
 //!
-//! Mirrors `VulkanTypes.cpp`. The C++ file holds both the enum *definitions* and
-//! the conversion helpers; here the definitions live in `chassis`, because they
-//! are the interface and must not depend on a backend. This file is the lowering
-//! half: everything that turns a `chassis` or render graph enum into a `vk::`
-//! value.
+//! The enum *definitions* live in `chassis`, because they are the interface and
+//! must not depend on a backend. This file is the lowering half: everything that
+//! turns a `chassis` or render graph enum into a `vk::` value.
 //!
 //! Having it in one file is deliberate. A mapping table with a hole in it produces
 //! a barrier with the wrong scope, which is the hardest class of GPU bug to
@@ -26,8 +24,7 @@ pub fn layout(state: ImageState) -> vk::ImageLayout {
 /// obvious case let `Depth24` through with `DEPTH_ATTACHMENT_OPTIMAL` and
 /// validation reported it as VUID-VkAttachmentDescription-separateDepthStencilLayouts-03285.
 ///
-/// A stencil aspect with a depth-only layout is invalid, and this is exactly the
-/// format coupling the C++ `RHITypes.h` descriptors hide.
+/// A stencil aspect with a depth-only layout is invalid.
 pub fn is_combined_depth_stencil(format: TextureFormat) -> bool {
     matches!(format, TextureFormat::Depth24Stencil8)
 }

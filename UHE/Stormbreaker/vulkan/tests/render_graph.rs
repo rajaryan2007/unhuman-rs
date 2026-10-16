@@ -209,7 +209,7 @@ fn declaration_order_is_the_execution_order() {
 /// A read binds to the version current *at declaration time*, and a write
 /// allocates the next version. So a pass can never depend on a version that a
 /// later pass produces: declaration order is always a valid topological order.
-/// The two passes below look cyclic but genuinely are not — each reads the
+/// The two passes below look cyclic but genuinely are not: each reads the
 /// pre-frame version its neighbour never wrote.
 #[test]
 fn a_cycle_cannot_be_declared() {

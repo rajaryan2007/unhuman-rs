@@ -1,19 +1,13 @@
 //! Host-to-device uploads.
 //!
-//! Replaces `VulkanDevice::ImmediateSubmit` (`VulkanDevice.cpp:670-696`), which
-//! had three problems worth naming:
+//! One ring per thread: its own staging buffer, command pool, command buffer and
+//! fence. A shared pool and fence would serialise every upload across every
+//! thread, and resetting that pool per call would drop an in-flight command
+//! buffer; two threads on one pool would race.
 //!
-//! 1. It **resets the command pool on every call** (`:695`), so any upload still
-//!    in flight loses its command buffer.
-//! 2. It waits with `waitForFences(..., UINT64_MAX)` on a **single shared fence**,
-//!    so every upload serialises against every other, from every thread.
-//! 3. It takes no lock, so two threads uploading at once race on that pool.
-//!
-//! Here each thread gets its own ring: its own staging buffer, command pool,
-//! command buffer and fence. An upload records and returns; the caller decides
-//! when to wait. The ring refuses to wrap while bytes the GPU has not read are
-//! still in the buffer, which turns "uploaded while in flight" from a corrupted
-//! frame into an explicit wait.
+//! An upload records and returns; the caller decides when to wait. The ring
+//! refuses to wrap while bytes the GPU has not read are still in the buffer, so
+//! "uploaded while in flight" is an explicit wait rather than a corrupted frame.
 
 use ash::vk;
 

@@ -2,13 +2,10 @@
 //!
 //! ## Why this file is not the swapchain object
 //!
-//! In C++ it is: `VulkanSwapChain.cpp` creates a `vk::SwapchainKHR`, keeps its
-//! images and views, and implements four `choose*` functions by hand. wgpu owns the
-//! swapchain itself -- `Surface::configure` builds it and the images belong to the
-//! driver -- so what is left for a file named after that one is the *negotiation*:
-//! which format, which present mode, what size, how many images, and what an
-//! out-of-date acquire means. [`WgpuSurface`](crate::wgpu_surface::WgpuSurface) is
-//! the object.
+//! wgpu owns the swapchain itself -- `Surface::configure` builds it and the images
+//! belong to the driver -- so what is left here is the *negotiation*: which format,
+//! which present mode, what size, how many images, and what an out-of-date acquire
+//! means. [`WgpuSurface`](crate::wgpu_surface::WgpuSurface) is the object.
 //!
 //! Everything here is a pure function of what the surface reported, so every case is
 //! testable with no device at all -- which is the only way the "you choose" rule and
@@ -21,13 +18,13 @@ use chassis::{Extent2d, TextureFormat};
 use crate::wgpu_device::to_wgpu_format;
 use crate::wgpu_error::WgpuError;
 
-/// The C++ `chooseSwapMinImageCount`: three images.
+/// Three swapchain images.
 ///
 /// Three is what makes the CPU never wait on the image the GPU is drawing -- one
 /// image means it waits every frame, two means it waits whenever the frame is late.
 /// wgpu states the same thing as a latency: "the number of frames in the swapchain
-/// is `desired_maximum_frame_latency + 1`, clamped to the supported range", and the
-/// clamp is the `minImageCount`/`maxImageCount` half the C++ does by hand.
+/// is `desired_maximum_frame_latency + 1`, clamped to the supported range", which
+/// covers the min/max image count range.
 pub const IMAGE_COUNT: u32 = 3;
 
 /// The latency that asks wgpu for `images` swapchain images.
@@ -41,8 +38,8 @@ pub fn images_for(latency: u32) -> u32 {
     latency + 1
 }
 
-/// The C++ `chooseSwapSurfaceFormat`: sRGB BGRA when the surface offers it, the
-/// surface's own first format otherwise.
+/// sRGB BGRA when the surface offers it, the surface's own first format
+/// otherwise.
 ///
 /// A *requested* format the surface does not offer is an error rather than a
 /// substitution. `Surface::configure` **panics** on an unsupported format, so the
@@ -70,10 +67,10 @@ pub fn choose_format(
         .ok_or(WgpuError::IncompatibleSurface)
 }
 
-/// The C++ `chooseSwapPresentMode`: mailbox when offered, fifo otherwise.
+/// Mailbox when offered, fifo otherwise.
 ///
 /// Fifo is the one mode both APIs guarantee, and the one that cannot tear; mailbox
-/// is the C++'s choice for the latency on top of it. A requested mode that is not
+/// buys lower latency on top of it. A requested mode that is not
 /// offered is an error because wgpu documents `FifoRelaxed`, `Immediate` and
 /// `Mailbox` as "crash if unsupported": substituting fifo would be a frame-pacing
 /// change reported as a success.
@@ -96,8 +93,10 @@ pub fn choose_present_mode(
     Ok(wgpu::PresentMode::Fifo)
 }
 
-/// The C++ passes `COMPOSITE_ALPHA_OPAQUE`. wgpu guarantees `Opaque` *or*
-/// `Inherit`, so the opaque one is taken when offered.
+/// The opaque alpha mode when offered.
+///
+/// wgpu guarantees the list contains `Opaque` or `Inherit`, so the opaque one is
+/// taken when it is there.
 pub fn choose_alpha_mode(modes: &[wgpu::CompositeAlphaMode]) -> wgpu::CompositeAlphaMode {
     if modes.contains(&wgpu::CompositeAlphaMode::Opaque) {
         return wgpu::CompositeAlphaMode::Opaque;
@@ -113,14 +112,14 @@ pub fn choose_alpha_mode(modes: &[wgpu::CompositeAlphaMode]) -> wgpu::CompositeA
 
 /// A size `Surface::configure` will accept.
 ///
-/// The C++ `chooseSwapExtent` clamps into the surface's min/max image extent and
-/// handles `currentExtent == UINT32_MAX`, its "you choose" sentinel. wgpu resolves
-/// that rule inside its own Vulkan layer (`wgpu-hal/src/vulkan/swapchain/native.rs`)
-/// and exposes no `current_extent` on `SurfaceCapabilities` at all, so the size the
-/// caller reports is the only one there is -- and `configure` panics on a zero one
-/// and refuses anything above `max_texture_dimension_2d`, so both ends are clamped
-/// here instead. A window larger than the device is a size the device cannot make,
-/// not a reason to fail a frame.
+/// wgpu resolves the surface's min/max image extent and its "you choose" sentinel
+/// (`currentExtent == UINT32_MAX`) inside its own Vulkan layer
+/// (`wgpu-hal/src/vulkan/swapchain/native.rs`) and exposes no `current_extent` on
+/// `SurfaceCapabilities` at all, so the size the caller reports is the only one
+/// there is -- and `configure` panics on a zero one and refuses anything above
+/// `max_texture_dimension_2d`, so both ends are clamped here instead. A window
+/// larger than the device is a size the device cannot make, not a reason to fail
+/// a frame.
 pub fn choose_extent(requested: Extent2d, max: u32) -> Extent2d {
     let max = max.max(1);
     Extent2d {
@@ -134,8 +133,7 @@ pub fn choose_extent(requested: Extent2d, max: u32) -> Extent2d {
 /// [`wgpu::CurrentSurfaceTexture`] has the same seven outcomes, and two of them
 /// carry the image -- so no test without a device could name them, and no caller
 /// wants the image before deciding what to do with it. This is that half, and it is
-/// the wgpu spelling of what the C++ swapchain reports as `VK_ERROR_OUT_OF_DATE_KHR`
-/// and its neighbours.
+/// the wgpu spelling of `VK_ERROR_OUT_OF_DATE_KHR` and its neighbours.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AcquireStatus {
     /// The swapchain matches the surface: draw and present.

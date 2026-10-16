@@ -1,16 +1,15 @@
 //! Debug scopes.
 //!
-//! Mirrors the labelling half of `VulkanImGuiBackend.cpp` / the Tracy zones in
-//! `UHE/src/UHE/Debug/TracySetup.h`.
+//! Object names and command-buffer labels through `VK_EXT_debug_utils`, the form
+//! that survives into a capture tool.
 //!
 //! Everything here is gated on `VK_EXT_debug_utils` being enabled on the instance
 //! and on the validation layer or a capture tool being attached. Without those,
 //! every function is a no-op, because a debug name on a release build costs a
 //! driver call to store a string nobody will read.
 //!
-//! The C++ engine keeps `TracySetup.h` and profiling macros wired separately from
-//! Vulkan. Here the scopes are Vulkan objects, because that is what they name, and
-//! because `VK_EXT_debug_utils` labels are the ones that survive into RenderDoc.
+//! Scopes are Vulkan objects here, because that is what they name, and
+//! `VK_EXT_debug_utils` labels are the ones that survive into RenderDoc.
 
 use ash::vk;
 

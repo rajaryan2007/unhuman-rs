@@ -1,7 +1,5 @@
 //! Command pools.
 //!
-//! Mirrors `VulkanCommandPool.cpp`.
-//!
 //! **One pool per command list, not one shared pool.** The first cut in this
 //! engine shared a single pool across every worker, reasoning that a pool only
 //! serialises allocation and reset. The validation layer says otherwise:
@@ -12,7 +10,7 @@
 //! simultaneously used in current thread A (vkCmdCopyBuffer) and thread B
 //! ```
 //!
-//! The pool — not the command buffer — is the external-synchronisation object
+//! The pool, not the command buffer, is the external-synchronisation object
 //! during recording. So list `i` is allocated from pool `i`, and the contract is
 //! that list `i` is recorded on thread `i`.
 //!
@@ -40,7 +38,7 @@ pub fn pool_flags() -> vk::CommandPoolCreateFlags {
 /// The level every list is allocated at.
 ///
 /// PRIMARY, not SECONDARY. A secondary buffer cannot be submitted to a queue at
-/// all — it must be executed from a primary through `vkCmdExecuteCommands`,
+/// all: it must be executed from a primary through `vkCmdExecuteCommands`,
 /// which puts one thread back in the recording path every frame. That is the
 /// exact bottleneck the per-list design exists to remove.
 pub const LEVEL: vk::CommandBufferLevel = vk::CommandBufferLevel::PRIMARY;
@@ -52,7 +50,7 @@ pub fn create_info(queue_family: u32) -> vk::CommandPoolCreateInfo<'static> {
 }
 
 /// Creates one pool. Kept separate from `Recorder` so a caller can own a pool for
-/// something the recorder does not know about — a primary upload list, say.
+/// something the recorder does not know about -- a primary upload list, say.
 pub fn create(device: &ash::Device, queue_family: u32) -> Result<vk::CommandPool> {
     let info = create_info(queue_family);
     unsafe { device.create_command_pool(&info, None) }

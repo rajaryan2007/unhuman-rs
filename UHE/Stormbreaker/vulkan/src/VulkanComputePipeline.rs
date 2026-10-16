@@ -1,8 +1,8 @@
 //! Compute pipelines.
 //!
-//! Mirrors `VulkanComputePipeline.cpp`. Separate from graphics because the two
-//! share only the layout and the description cache — everything else differs:
-//! no vertex input, no rasterisation, no blending, and a different create call.
+//! Separate from graphics because the two share only the layout and the
+//! description cache; everything else differs: no vertex input, no rasterisation,
+//! no blending, and a different create call.
 
 use ash::vk;
 use chassis::Pipeline;

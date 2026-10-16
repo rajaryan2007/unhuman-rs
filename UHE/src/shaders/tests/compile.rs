@@ -1,8 +1,8 @@
 //! End-to-end: drive the vendored Slang and check the SPIR-V that comes out.
 //!
 //! These tests need the compiler. They skip rather than fail when it is absent,
-//! because `cargo test` has to work on a machine that has never cloned the C++
-//! tree -- but a missing compiler is never silent, the skip says so.
+//! because `cargo test` has to work on a machine with no vendored compiler --
+//! but a missing compiler is never silent, the skip says so.
 
 use forge::cache::ShaderCache;
 use forge::slangc::{attach_locations, parse_diagnostics, SlangcCompiler};

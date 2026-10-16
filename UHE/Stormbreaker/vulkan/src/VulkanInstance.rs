@@ -1,11 +1,9 @@
 //! Vulkan instance.
 //!
-//! Mirrors `VulkanInstance.cpp`.
-//!
 //! Two things here are easy to get wrong and both have bitten this engine:
 //!
 //! * **Which API version to request.** It is the *loader's* version, capped at
-//!   what the engine uses — not a hardcoded 1.1. The loader only exposes entry
+//!   what the engine uses, not a hardcoded 1.1. The loader only exposes entry
 //!   points for the version requested here, so asking for less than the engine
 //!   intends to use means `vkCmdPipelineBarrier2` and `vkQueueSubmit2` are never
 //!   loaded, and ash's stub for a missing function panics. The hardcoded 1.1

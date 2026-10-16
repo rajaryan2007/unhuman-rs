@@ -2,11 +2,11 @@
 //!
 //! Wraps the `slangc` binary rather than linking `libslang.so` in process. That
 //! is a deliberate first cut, and the reason is the ABI: the Slang C API is
-//! made of C++ virtual interfaces (`slang::ISession`, `slang::IModule`), so
-//! binding it means binding a C++ vtable layout across a crate boundary, plus
+//! made of virtual interfaces (`slang::ISession`, `slang::IModule`), so
+//! binding it means binding a vtable layout across a crate boundary, plus
 //! libclang as a build-time dependency for `bindgen`. The driver gives us the
 //! same compiler, the same diagnostics and the same output today, with none of
-//! that risk — and it sits behind [`ShaderCompiler`], so swapping in the FFI
+//! that risk, and it sits behind [`ShaderCompiler`], so swapping in the FFI
 //! later is a new implementation of one trait, not a change to any caller.
 
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ use crate::ForgeError;
 
 /// Where the vendored `slangc` lives, as a path relative to the *workspace* root.
 ///
-/// The C++ tree already vendors a built Slang distribution
+/// The tree already vendors a built Slang distribution
 /// (`UHE/vendor/bin/linux/slang/`), and using that exact compiler is the point:
 /// a second compiler in the project would be a second set of bugs and a second
 /// thing to patch.
@@ -43,16 +43,15 @@ pub fn discover() -> Slangc {
     Slangc::System
 }
 
-/// Walk up from this crate looking for the C++ tree.
+/// Walk up from this crate looking for the vendored Slang distribution.
 fn vendored_path() -> Option<PathBuf> {
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     for ancestor in manifest.ancestors() {
-        // `crates/forge` -> workspace root -> the sibling `unhuman`.
+        // The vendored tree sits above the workspace, not inside it.
         let candidate = ancestor.join(VENDORED);
         if candidate.is_file() {
             return Some(candidate);
         }
-        // The C++ tree is a sibling of this workspace, not a child of it.
         let sibling = ancestor.join("..").join(VENDORED);
         if sibling.is_file() {
             return Some(sibling);
@@ -94,7 +93,7 @@ impl Slangc {
     ///
     /// Part of the cache key. A cached module built by a different Slang must
     /// not be reused, because the same source can legitimately produce
-    /// different SPIR-V across versions — so a key that omits this serves stale
+    /// different SPIR-V across versions, so a key that omits this serves stale
     /// shaders after a toolchain bump, which is close to undebuggable.
     pub fn version(&self) -> Result<String, ForgeError> {
         let output = Command::new(self.executable())

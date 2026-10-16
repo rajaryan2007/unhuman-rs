@@ -1,9 +1,8 @@
 //! Small conversions and helpers.
 //!
-//! Mirrors `VulkanUtils.cpp`. The enum-to-Vulkan mapping that also lived there is
-//! now in `types.rs`, because a mapping table with a hole in it is the kind of
-//! bug that only shows up as a wrong barrier on someone else's GPU. What is left
-//! here is genuinely incidental: extents, offsets, names.
+//! The enum-to-Vulkan mapping lives in `types.rs`, not here, because a mapping
+//! table with a hole in it shows up as a wrong barrier on someone else's GPU.
+//! What is left here is incidental: extents, offsets, names.
 
 use std::ffi::CStr;
 

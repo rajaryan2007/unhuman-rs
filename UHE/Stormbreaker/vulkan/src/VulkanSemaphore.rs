@@ -1,14 +1,8 @@
 //! Semaphores.
 //!
-//! Mirrors `VulkanSemaphore.cpp` (the tier-switching submit) and
-//! `VulkanBinarySemaphore.cpp`. The C++ tree's `VulkanBinarySemaphore.h` and
-//! `VulkanBinaryFence.h` both define the same type, which is the ODR violation
-//! called out in `docs/vulkan-sync-and-rendergraph.md:87-90`; the fence side lives
-//! in `fence.rs` and this file owns semaphores.
-//!
-//! Binary semaphores exist on every tier. Timeline semaphores need Vulkan 1.2, and
-//! the whole point of the `SyncTier` ladder is that callers never have to ask: they
-//! ask for a chain and the tier decides whether it rides one semaphore with values
+//! Binary semaphores exist on every tier. Timeline semaphores need Vulkan 1.2,
+//! and the point of the `SyncTier` ladder is that callers never have to ask: they
+//! request a chain and the tier decides whether it rides one semaphore with values
 //! or one binary semaphore per link. That switch is in `submit_encoder.rs`.
 
 use std::time::Duration;
@@ -36,7 +30,7 @@ impl Semaphore {
     }
 
     /// Timeline semaphores need Vulkan 1.2. Whether to ask for one is the tier's
-    /// decision, not the caller's — see `Recorder::uses_timeline`.
+    /// decision, not the caller's; see `Recorder::uses_timeline`.
     pub fn timeline(device: &ash::Device, initial: u64) -> Result<Self> {
         let type_info = vk::SemaphoreTypeCreateInfo::default()
             .semaphore_type(vk::SemaphoreType::TIMELINE)

@@ -145,8 +145,7 @@ impl WgpuSurface {
     ///
     /// `false` when nothing needed doing. `Surface::configure` waits for the device
     /// to go idle, so a window drag's worth of resize events must not each pay for
-    /// one: the C++ `ResizeSwapchain` is an empty body, which is the same idea
-    /// without the check.
+    /// one.
     pub fn reconfigure(&mut self, extent: chassis::Extent2d) -> Result<bool, WgpuError> {
         if extent == self.extent && !self.out_of_date {
             return Ok(false);
@@ -337,8 +336,8 @@ fn plan(
         wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: chosen,
-            // `Auto` resolves to sRGB for a `*Srgb` format, which is what the C++
-            // gets by asking for `eB8G8R8A8Srgb` plus `eSrgbNonlinear` directly.
+            // `Auto` resolves to sRGB for a `*Srgb` format, the same colour space
+            // as requesting `SrgbNonlinear` directly.
             color_space: wgpu::SurfaceColorSpace::Auto,
             width: extent.width,
             height: extent.height,

@@ -29,7 +29,7 @@
 //! Unlike the wgpu one, this executor records barriers: the graph's neutral
 //! barriers lowered by [`crate::vulkan_barrier_encoder`], per the device's tier.
 //! And unlike wgpu, it needs its resources to be the *same* registry the `Gpu`
-//! exposes — a handle made through `dyn Resources` has to resolve in the command
+//! exposes: a handle made through `dyn Resources` has to resolve in the command
 //! list, or every pass that uses one fails with `InvalidHandle`.
 
 use std::sync::Arc;

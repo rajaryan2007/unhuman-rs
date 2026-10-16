@@ -1,16 +1,16 @@
 //! Shader compilation. Slang in, SPIR-V out.
 //!
 //! The point of this crate is that a shader and the pipeline that uses it are
-//! compiled by *one* compiler. The C++ tree vendors a built Slang
-//! distribution and `forge` drives that exact binary, so a bug reproduced with
-//! `slangc` on the command line is the same bug the engine hit.
+//! compiled by *one* compiler. The tree vendors a built Slang distribution and
+//! `forge` drives that exact binary, so a bug reproduced with `slangc` on the
+//! command line is the same bug the engine hit.
 //!
 //! [`ShaderCompiler`] is a trait for that reason, not for pluggability's sake:
 //! the first implementation shells out to the driver (see [`slangc`]), and an
 //! in-process `libslang.so` binding replaces it without touching a caller.
-//! The driver exists first because the Slang C API is C++ virtual interfaces,
-//! so linking it in process means binding a vtable layout across a crate
-//! boundary for no benefit until compile time actually matters.
+//! The driver exists first because the Slang C API is a vtable of virtual
+//! interfaces, so linking it in process means binding that layout across a
+//! crate boundary for no benefit until compile time actually matters.
 
 pub mod cache;
 pub mod request;
@@ -156,7 +156,7 @@ impl Forge {
     /// Compile, or load from cache.
     ///
     /// The cache is consulted before the compiler is run, and the key includes
-    /// the source bytes, every flag and the compiler version — so a hit is
+    /// the source bytes, every flag and the compiler version, so a hit is
     /// guaranteed to be the module the source would have produced.
     pub fn compile(
         &self,

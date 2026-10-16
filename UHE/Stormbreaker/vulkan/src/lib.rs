@@ -6,11 +6,9 @@
 //! gets) and `barrier_encoder` (the single place a graph barrier becomes a
 //! Vulkan command).
 //!
-//! Every file here is named after the C++ file it came from, so a file can be
-//! put next to its original: `VulkanBuffer.rs` beside `VulkanBuffer.cpp`. The
-//! module identifier stays snake_case through `#[path]`, which keeps `use
-//! crate::vulkan_buffer::...` idiomatic and avoids a non_snake_case warning on
-//! every declaration.
+//! Files keep their `Vulkan*` names while the module identifier stays
+//! snake_case through `#[path]`, which keeps `use crate::vulkan_buffer::...`
+//! idiomatic and avoids a non_snake_case warning on every declaration.
 
 #[path = "VulkanAllocation.rs"]
 pub mod vulkan_allocation;

@@ -1,8 +1,6 @@
 //! Submit-chain construction.
 //!
-//! Mirrors the tier switch inside `VulkanSemaphore::Submit`
-//! (`VulkanSemaphore.cpp:63-145`), pulled out into its own file because it is the
-//! only place in the engine that decides *how* an ordering edge is expressed.
+//! The only place in the engine that decides *how* an ordering edge is expressed.
 //!
 //! One API, two encodings, chosen by `SyncTier`:
 //!

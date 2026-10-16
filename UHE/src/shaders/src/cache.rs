@@ -3,7 +3,7 @@
 //! Keyed on the *source bytes* plus every compiler flag plus the compiler
 //! version. All three matter, and the third is the one that is easy to forget:
 //! Slang's output can legitimately change between versions, so a key that omits
-//! it serves stale SPIR-V after a toolchain bump — a bug that looks like a
+//! it serves stale SPIR-V after a toolchain bump, a bug that looks like a
 //! driver bug and survives every other check.
 
 use std::collections::hash_map::DefaultHasher;
@@ -16,7 +16,7 @@ use crate::ForgeError;
 /// An FNV-1a hash, written out rather than pulled in.
 ///
 /// A cache key needs a hash that cannot change between runs. `DefaultHasher`
-/// carries no such promise — it is explicitly not stable across Rust versions —
+/// carries no such promise (it is explicitly not stable across Rust versions),
 /// so using it here would silently invalidate, or worse silently *not*
 /// invalidate, across toolchain bumps.
 #[derive(Clone, Copy)]

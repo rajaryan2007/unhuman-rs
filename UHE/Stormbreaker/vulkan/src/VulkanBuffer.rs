@@ -1,11 +1,8 @@
 //! Buffers.
 //!
-//! Mirrors `UHE/src/Platform/Vulkan/VulkanBuffer.cpp` and goes one better: the
-//! handle is a typed generational handle from `chassis::Registry`, so a buffer
-//! cannot be passed where a texture belongs and a freed handle stops resolving.
-//! The C++ engine carries `reinterpret_cast`-ed `void*` handles
-//! (`RHITypes.h:37-41`), which is why `VulkanDevice.cpp` can only validate them
-//! by round-tripping them.
+//! The handle is a typed generational handle from `chassis::Registry`, so a
+//! buffer cannot be passed where a texture belongs and a freed handle stops
+//! resolving.
 
 use ash::vk;
 use chassis::{Buffer, BufferDesc, BufferUsage, Registry};

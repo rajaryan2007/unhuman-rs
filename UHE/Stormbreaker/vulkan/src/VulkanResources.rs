@@ -84,9 +84,9 @@ pub struct VulkanResources {
     /// rather than dropping the bytes and returning `Ok` -- a texture that
     /// silently has no contents is the failure this method exists to remove.
     ///
-    /// One ring per `VulkanResources`, i.e. one per `Gpu`. The C++ engine reset a
-    /// shared pool and waited on a shared fence on *every* upload; `UploadRing`
-    /// stops that, and giving each resource set its own is the other half.
+    /// One ring per `VulkanResources`, i.e. one per `Gpu`: each resource set owns
+    /// its pool and fence rather than sharing one that must be reset and waited on
+    /// for every upload.
     upload: Option<crate::vulkan_upload::UploadRing>,
     /// `VkPhysicalDeviceLimits::minUniformBufferOffsetAlignment`.
     ///
@@ -104,16 +104,11 @@ pub struct VulkanResources {
 impl Drop for VulkanResources {
     /// Frees the live samplers.
     ///
-    /// ## Why this exists and the others do not
-    ///
     /// Buffers, textures and pipelines are destroyed explicitly through
-    /// `destroy_*`, and a caller that forgets leaks -- visible under validation as
-    /// `vkDestroyDevice-device-05137`.
-    ///
-    /// Samplers were getting the same treatment, and the first test that created
-    /// one without destroying it leaked a `VkSampler`. That is the argument for
-    /// *this* type and not the others: a sampler is small, is created per
-    /// material rather than per resource, and nothing else in the frame owns it.
+    /// `destroy_*`, and a caller that forgets leaks, visible under validation as
+    /// `vkDestroyDevice-device-05137`. A sampler is small, created per material
+    /// rather than per resource, and owned by nothing else in the frame, so it is
+    /// freed here.
     ///
     /// The layouts and descriptor sets go with the descriptor pool, and the pool
     /// goes when `Descriptors` drops.
@@ -559,12 +554,9 @@ impl chassis::Resources for VulkanResources {
 
             // Refused rather than clamped: `offset >= size` gives either a zero
             // range or one that runs off the end, and both are
-            // `vkUpdateDescriptorSets` validation errors. This used to be
-            // `saturating_sub`, which turned an offset of 256 into a range of 0
-            // -- the call returned `Ok` and the descriptor pointed at nothing.
-            // Alignment first. A misaligned offset that is also past the end
-            // should name the alignment, which is the thing wrong about it in
-            // both cases.
+            // `vkUpdateDescriptorSets` validation errors. Alignment first: a
+            // misaligned offset that is also past the end should name the
+            // alignment, which is the thing wrong about it in both cases.
             let alignment = match declared_type(layout, *binding)? {
                 vk::DescriptorType::UNIFORM_BUFFER => self.uniform_buffer_alignment,
                 _ => 1,
@@ -658,14 +650,11 @@ impl chassis::Resources for VulkanResources {
                     .image_info(std::slice::from_ref(info)),
             );
         }
-        // Two passes over one shared `kinds` vector.
-        //
-        // One pass cannot: `writes` borrows `sampler_infos[slot]`, and that
-        // borrow is still live at the next iteration's `push`. Two passes that
-        // each *decided* the kind independently is how they came to disagree --
-        // one skipped combined bindings and the other wrote them, so a combined
-        // binding indexed an empty vector. Sharing `kinds` means there is one
-        // decision, read twice.
+        // Two passes over one shared `kinds` vector, because `writes` borrows the
+        // info slices and the borrow is still live at the next iteration. Two
+        // independent decisions is how they came to disagree: one skipped combined
+        // bindings and the other wrote them, so a combined binding indexed an
+        // empty vector. Sharing `kinds` means one decision, read twice.
         let mut sampler_kinds = Vec::with_capacity(samplers.len());
         for (binding, _) in samplers {
             sampler_kinds.push(declared_kind(layout, *binding)?);
