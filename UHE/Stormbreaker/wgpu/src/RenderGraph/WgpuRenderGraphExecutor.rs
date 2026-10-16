@@ -75,6 +75,7 @@
 
 use chassis::graph::pass::{PassRecorder, PassScope, SlotTable};
 use chassis::graph::{CompiledGraph, ImageState, TextureId};
+use chassis::CommandList;
 
 use crate::wgpu_command_buffer::{Recording, WgpuCommandList};
 use crate::wgpu_device::Queue;
@@ -198,7 +199,12 @@ impl WgpuRenderGraphExecutor {
                     extent: self.extent,
                     slots: &self.slots,
                 };
+                let opened =
+                    open_render_scope(pass, &self.slots, &self.resources, self.extent, &mut list)?;
                 record.record(&scope, &mut list)?;
+                if opened {
+                    list.end_rendering();
+                }
             }
             if recording.is_inside_render_pass() {
                 // A pass that began a render scope and never ended it. Submitted
@@ -235,6 +241,83 @@ impl WgpuRenderGraphExecutor {
             .poll(wgpu::PollType::wait_indefinitely())
             .map(|_| ())
             .map_err(|error| chassis::Error::Unsupported(format!("poll failed: {error:?}")))
+    }
+}
+
+/// Begin dynamic rendering for a pass, if it has attachments.
+///
+/// The executor opens the scope, not the pass: the compiled pass already names
+/// its attachments, so a pass that opened its own could open it on the wrong
+/// ones, and the failure would surface as a draw with no active render pass.
+/// Returns whether a scope was opened, so the caller closes exactly what it
+/// opened. A pass with no attachments -- a compute or transfer pass -- gets no
+/// scope.
+fn open_render_scope(
+    pass: &chassis::graph::CompiledPass,
+    slots: &SlotTable,
+    resources: &WgpuResources,
+    extent: chassis::Extent2d,
+    list: &mut WgpuCommandList<'_>,
+) -> Result<bool, chassis::Error> {
+    if pass.colors.is_empty() && pass.depth.is_none() {
+        return Ok(false);
+    }
+
+    let unbound = |kind: &str| {
+        chassis::Error::Unsupported(format!(
+            "pass '{}' has a {kind} attachment on a slot with no texture bound",
+            pass.name
+        ))
+    };
+
+    let mut desc = chassis::RenderPassDesc {
+        label: pass.name.clone(),
+        ..Default::default()
+    };
+    for color in &pass.colors {
+        let handle = slots
+            .texture(color.texture)
+            .ok_or_else(|| unbound("colour"))?;
+        let format = resources
+            .get_texture(handle)
+            .map(|texture| texture.format())
+            .ok_or_else(|| unbound("colour"))?;
+        desc.colors.push(chassis::ColorAttachmentDesc {
+            texture: handle,
+            format,
+            load: load_op(color.load),
+            store: true,
+            resolve: chassis::Texture::null(),
+        });
+    }
+    if let Some(depth) = &pass.depth {
+        let handle = slots
+            .texture(depth.texture)
+            .ok_or_else(|| unbound("depth"))?;
+        let format = resources
+            .get_texture(handle)
+            .map(|texture| texture.format())
+            .ok_or_else(|| unbound("depth"))?;
+        desc.depth = Some(chassis::DepthAttachmentDesc {
+            texture: handle,
+            format,
+            load: load_op(depth.load),
+            store: true,
+        });
+    }
+
+    list.begin_rendering(&desc);
+    list.set_viewport(extent);
+    list.set_scissor(0, 0, extent.width, extent.height);
+    Ok(true)
+}
+
+/// The graph's load op as the RHI's: same three variants, one crate apart.
+fn load_op(load: chassis::graph::LoadOp) -> chassis::LoadOp {
+    match load {
+        chassis::graph::LoadOp::Load => chassis::LoadOp::Load,
+        chassis::graph::LoadOp::Clear => chassis::LoadOp::Clear,
+        chassis::graph::LoadOp::DontCare => chassis::LoadOp::DontCare,
     }
 }
 

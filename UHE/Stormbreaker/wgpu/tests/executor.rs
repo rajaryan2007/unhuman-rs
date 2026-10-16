@@ -5,7 +5,7 @@
 
 use chassis::graph as rg;
 use chassis::graph::{NoRecording, PassRecorder, PassScope, SlotTable};
-use chassis::CommandList;
+use chassis::{CommandList, Resources};
 use stormglass::wgpu_device::Adapter;
 use stormglass::wgpu_render_graph_executor::{
     backbuffer_slot, resolve_backbuffer, ExecutorStats, WgpuRenderGraphExecutor as WgpuExecutor,
@@ -21,7 +21,7 @@ const HEIGHT: u32 = 64;
 /// the image to `TransferSrc` for readback -- is a post-barrier on the last
 /// writer, not a pass of its own. That is the difference between a barrier and a
 /// pass, and it is why the count here is 2 and not 3.
-fn two_pass_frame() -> rg::RenderGraph {
+fn two_pass_frame() -> (rg::RenderGraph, rg::TextureId) {
     let mut graph = rg::RenderGraph::new();
     let target = graph.import_texture(
         "target",
@@ -36,7 +36,26 @@ fn two_pass_frame() -> rg::RenderGraph {
         .pass("resolve")
         .kind(rg::PassType::Graphics)
         .color_load(target);
-    graph
+    (graph, target)
+}
+
+/// Bind a real colour target to `slot`, so the executor can open a render scope
+/// for a pass that writes it. The executor opens the scope from the compiled
+/// pass's attachments, so an unbound one is refused before the recorder runs.
+fn bind_target(executor: &mut WgpuExecutor, slot: rg::TextureId) {
+    let texture = executor
+        .resources_mut()
+        .create_texture(chassis::TextureDesc::new_2d(
+            chassis::Extent {
+                width: WIDTH,
+                height: HEIGHT,
+                depth: 1,
+            },
+            chassis::TextureFormat::Rgba8Unorm,
+            chassis::TextureUsage::COLOR_ATTACHMENT,
+        ))
+        .expect("the target texture");
+    executor.slots_mut().set_texture(slot, texture);
 }
 
 /// One compiled frame, submitted. No pixels yet -- the pipeline and the command
@@ -60,9 +79,10 @@ fn a_compiled_frame_runs_through_the_executor() {
         },
     );
 
-    let graph = two_pass_frame();
+    let (graph, target) = two_pass_frame();
     let compiled = graph.compile().expect("the frame compiles");
     assert_eq!(compiled.passes.len(), 2, "both passes survive culling");
+    bind_target(&mut executor, target);
 
     executor
         .execute(&compiled, &NoRecording)
@@ -102,8 +122,9 @@ fn two_frames_in_a_row_both_run() {
             height: HEIGHT,
         },
     );
-    let graph = two_pass_frame();
+    let (graph, target) = two_pass_frame();
     let compiled = graph.compile().expect("compiles");
+    bind_target(&mut executor, target);
 
     for _ in 0..2 {
         executor
@@ -173,8 +194,9 @@ fn a_renderer_writes_one_pass_recorder_for_either_backend() {
         },
     );
 
-    let graph = two_pass_frame();
+    let (graph, target) = two_pass_frame();
     let compiled = graph.compile().expect("compiles");
+    bind_target(&mut executor, target);
 
     // A plain closure: no backend type, no backend import, nothing but chassis.
     //
@@ -232,10 +254,12 @@ fn a_pass_that_never_closes_its_render_scope_is_refused() {
         rg::ImageState::Undefined,
         rg::ImageState::ShaderRead,
     );
+    // No attachments, so the executor opens no scope of its own and this is the
+    // recorder's to open -- which is exactly the bug being tested.
     graph
         .pass("leaky")
         .kind(rg::PassType::Graphics)
-        .color_load(target);
+        .read_texture(target);
     let compiled = graph.compile().expect("compiles");
 
     let record = |scope: &PassScope<'_>, list: &mut dyn CommandList| {

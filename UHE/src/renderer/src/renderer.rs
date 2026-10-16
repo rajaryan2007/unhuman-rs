@@ -81,6 +81,8 @@ struct FrameTextures {
     shadow_view: ImageView,
     ssao: Texture,
     ssao_view: ImageView,
+    /// The composition target when there is no swapchain to present to.
+    offscreen: Texture,
     /// Clamped linear: a render target's edge should clamp, not wrap.
     sampler: Sampler,
 }
@@ -98,6 +100,7 @@ impl FrameTextures {
             shadow_view: ImageView::null(),
             ssao: Texture::null(),
             ssao_view: ImageView::null(),
+            offscreen: Texture::null(),
             sampler: Sampler::null(),
         }
     }
@@ -106,6 +109,7 @@ impl FrameTextures {
         resources: &mut dyn Resources,
         extent: Extent2d,
         shadow_size: u32,
+        composite_format: TextureFormat,
     ) -> Result<Self, Error> {
         let width = extent.width.max(1);
         let height = extent.height.max(1);
@@ -141,6 +145,12 @@ impl FrameTextures {
         ))?;
         let ssao_view = resources.create_image_view(&ssao)?;
 
+        let offscreen = resources.create_texture(TextureDesc::new_2d(
+            Extent::new(width, height),
+            composite_format,
+            TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED,
+        ))?;
+
         let sampler = resources.create_sampler(&SamplerDesc::clamped())?;
 
         Ok(Self {
@@ -152,6 +162,7 @@ impl FrameTextures {
             shadow_view,
             ssao,
             ssao_view,
+            offscreen,
             sampler,
         })
     }
@@ -161,6 +172,7 @@ impl FrameTextures {
         resources.destroy_texture(self.depth);
         resources.destroy_texture(self.shadow);
         resources.destroy_texture(self.ssao);
+        resources.destroy_texture(self.offscreen);
         resources.destroy_sampler(self.sampler);
     }
 }
@@ -169,6 +181,9 @@ impl FrameTextures {
 pub struct Bifrost {
     extent: Extent2d,
     swapchain_format: TextureFormat,
+    /// Whether there is a swapchain to present to. Without one the composition
+    /// renders to `textures.offscreen` instead of the backbuffer.
+    has_surface: bool,
     textures: FrameTextures,
 
     shaders: ShaderSet,
@@ -223,14 +238,16 @@ impl Bifrost {
             .swapchain()
             .map(|swapchain| swapchain.format())
             .unwrap_or(TextureFormat::Bgra8Srgb);
+        let has_surface = gpu.swapchain().is_some();
 
         let resources = gpu.resources();
         let shaders = ShaderSet::load(resources)?;
-        let textures = FrameTextures::create(resources, extent, SHADOW_MAP_SIZE)?;
+        let textures = FrameTextures::create(resources, extent, SHADOW_MAP_SIZE, swapchain_format)?;
 
         let mut bifrost = Self {
             extent,
             swapchain_format,
+            has_surface,
             textures,
             shaders,
             pipelines: PipelineCache::new(),
@@ -454,7 +471,8 @@ impl Bifrost {
         }
         if extent != self.extent {
             let resources = gpu.resources();
-            let textures = FrameTextures::create(resources, extent, SHADOW_MAP_SIZE)?;
+            let textures =
+                FrameTextures::create(resources, extent, SHADOW_MAP_SIZE, self.swapchain_format)?;
             let old = std::mem::replace(&mut self.textures, textures);
             old.destroy(resources);
             self.extent = extent;
@@ -484,6 +502,12 @@ impl Bifrost {
         slots.set_texture(targets.scene_depth, self.textures.depth);
         slots.set_texture(targets.shadow, self.textures.shadow);
         slots.set_texture(targets.ssao, self.textures.ssao);
+        // With a surface, the executor resolves the backbuffer slot from the
+        // acquired swapchain image. Headless, nothing can, so bind the offscreen
+        // target here.
+        if !self.has_surface {
+            slots.set_texture(targets.backbuffer, self.textures.offscreen);
+        }
 
         let (light_buffer, light_count) = self.lights.ensure(resources, &light_data)?;
         let frame_uniforms = uniforms::FrameUniforms::new(
@@ -542,8 +566,16 @@ impl Bifrost {
         let shadow =
             graph.import_texture("shadow.map", ImageState::Undefined, ImageState::ShaderRead);
         let ssao = graph.import_texture("ssao.ao", ImageState::Undefined, ImageState::ShaderRead);
+        // Present only when there is a swapchain. Headless, the composition ends
+        // at a colour state, so the backend sees no backbuffer slot to acquire
+        // and draws to the offscreen target instead.
+        let backbuffer_state = if self.has_surface {
+            ImageState::Present
+        } else {
+            ImageState::ColorAttachment
+        };
         let backbuffer =
-            graph.import_texture("backbuffer", ImageState::Undefined, ImageState::Present);
+            graph.import_texture("backbuffer", ImageState::Undefined, backbuffer_state);
 
         // The shadow map: depth only, cleared to the far plane.
         graph
