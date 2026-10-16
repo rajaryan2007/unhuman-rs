@@ -62,10 +62,10 @@ UHE/src/Platform/Vulkan/RenderGraph/VulkanRenderGraphTypes.cpp|moved|UHE/src/rhi
 UHE/src/Platform/Vulkan/RenderGraph/VulkanRenderGraphTypes.h|moved|UHE/src/rhi/src/graph/types.rs
 UHE/src/Platform/Vulkan/ShaderSystem/VulkanShaderManager.cpp|skip|`Init()` and `ShutDown()` are both empty bodies (`docs/WORK.md`)
 UHE/src/Platform/Vulkan/ShaderSystem/VulkanShaderManager.h|skip|`Init()` and `ShutDown()` are both empty bodies (`docs/WORK.md`)
-UHE/src/Platform/Vulkan/UI/VulkanImGuiBackend.cpp|moved|UHE/bins/editor/src/main.rs + UHE/src/editor/src/lib.rs
-UHE/src/Platform/Vulkan/UI/VulkanImGuiBackend.h|moved|UHE/bins/editor/src/main.rs + UHE/src/editor/src/lib.rs
-UHE/src/Platform/Vulkan/UI/VulkanImGuiPass.cpp|moved|UHE/bins/editor/src/main.rs + UHE/src/editor/src/lib.rs
-UHE/src/Platform/Vulkan/UI/VulkanImGuiPass.h|moved|UHE/bins/editor/src/main.rs + UHE/src/editor/src/lib.rs
+UHE/src/Platform/Vulkan/UI/VulkanImGuiBackend.cpp|moved|UHE-EDITOR/editor/src/main.rs + UHE-EDITOR/mirror/src/lib.rs
+UHE/src/Platform/Vulkan/UI/VulkanImGuiBackend.h|moved|UHE-EDITOR/editor/src/main.rs + UHE-EDITOR/mirror/src/lib.rs
+UHE/src/Platform/Vulkan/UI/VulkanImGuiPass.cpp|moved|UHE-EDITOR/editor/src/main.rs + UHE-EDITOR/mirror/src/lib.rs
+UHE/src/Platform/Vulkan/UI/VulkanImGuiPass.h|moved|UHE-EDITOR/editor/src/main.rs + UHE-EDITOR/mirror/src/lib.rs
 UHE/src/Platform/Vulkan/VulkanBarrierEncoder.cpp|moved|UHE/Stormbreaker/vulkan/src/VulkanBarrierEncoder.rs
 UHE/src/Platform/Vulkan/VulkanBarrierEncoder.h|moved|UHE/Stormbreaker/vulkan/src/VulkanBarrierEncoder.rs
 UHE/src/Platform/Vulkan/VulkanBinaryFence.cpp|moved|UHE/Stormbreaker/vulkan/src/VulkanFence.rs
@@ -167,10 +167,10 @@ UHE/src/UHE/Events/ApplicationEvent.h|moved|UHE/src/events/src/event.rs
 UHE/src/UHE/Events/Event.h|moved|UHE/src/events/src/event.rs
 UHE/src/UHE/Events/KeyEvent.h|moved|UHE/src/events/src/event.rs
 UHE/src/UHE/Events/MouseEvent.h|moved|UHE/src/events/src/event.rs
-UHE/src/UHE/ImGui/ImGuiBuild.cpp|skip|replaced, not dropped: the model is `mirror`, drawn by gpui in `UHE/bins/editor` (`docs/WORK.md`)
-UHE/src/UHE/ImGui/ImGuiLayer.cpp|moved|UHE/bins/editor/src/main.rs
-UHE/src/UHE/ImGui/ImGuiLayer.h|moved|UHE/bins/editor/src/main.rs
-UHE/src/UHE/ImGui/ImGuiLogsink.h|skip|replaced, not dropped: the model is `mirror`, drawn by gpui in `UHE/bins/editor` (`docs/WORK.md`)
+UHE/src/UHE/ImGui/ImGuiBuild.cpp|skip|replaced, not dropped: the model is `mirror`, drawn by gpui in `UHE-EDITOR/editor` (`docs/WORK.md`)
+UHE/src/UHE/ImGui/ImGuiLayer.cpp|moved|UHE-EDITOR/editor/src/main.rs
+UHE/src/UHE/ImGui/ImGuiLayer.h|moved|UHE-EDITOR/editor/src/main.rs
+UHE/src/UHE/ImGui/ImGuiLogsink.h|skip|replaced, not dropped: the model is `mirror`, drawn by gpui in `UHE-EDITOR/editor` (`docs/WORK.md`)
 UHE/src/UHE/Jobsystem/Jobsystem.cpp|moved|UHE/src/jobs/src/jobs.rs
 UHE/src/UHE/Jobsystem/Jobsystem.h|moved|UHE/src/jobs/src/jobs.rs
 UHE/src/UHE/Jobsystem/Taskgraph.cpp|moved|UHE/src/jobs/src/taskgraph.rs
@@ -214,8 +214,8 @@ UHE/src/UHE/Renderer/Texture.cpp|moved|UHE/src/assets/src/image.rs
 UHE/src/UHE/Renderer/Texture.h|moved|UHE/src/assets/src/image.rs
 UHE/src/UHE/Renderer2D/OrthographicCamera.cpp|skip|2D path: excluded from the C++ build (`UHE/CMakeLists.txt:12`, `docs/WORK.md`)
 UHE/src/UHE/Renderer2D/OrthographicCamera.h|skip|2D path: excluded from the C++ build (`UHE/CMakeLists.txt:12`, `docs/WORK.md`)
-UHE/src/UHE/Renderer2D/OrthograpicCameraContoroller.cpp|skip|the C++ editor referenced it (`UHE_EDITOR/src/Editor.h`); the port has no 2D camera controller — a 2D view would be `meats::SceneCamera::new_orthographic` plus an input path the editor does not have yet (`mirror` and `UHE/bins/editor` read no input)
-UHE/src/UHE/Renderer2D/OrthograpicCameraContoroller.h|skip|the C++ editor referenced it (`UHE_EDITOR/src/Editor.h`); the port has no 2D camera controller — a 2D view would be `meats::SceneCamera::new_orthographic` plus an input path the editor does not have yet (`mirror` and `UHE/bins/editor` read no input)
+UHE/src/UHE/Renderer2D/OrthograpicCameraContoroller.cpp|skip|the C++ editor referenced it (`UHE_EDITOR/src/Editor.h`); the port has no 2D camera controller — a 2D view would be `meats::SceneCamera::new_orthographic` plus an input path the editor does not have yet (`mirror` and `UHE-EDITOR/editor` read no input)
+UHE/src/UHE/Renderer2D/OrthograpicCameraContoroller.h|skip|the C++ editor referenced it (`UHE_EDITOR/src/Editor.h`); the port has no 2D camera controller — a 2D view would be `meats::SceneCamera::new_orthographic` plus an input path the editor does not have yet (`mirror` and `UHE-EDITOR/editor` read no input)
 UHE/src/UHE/Renderer2D/Renderer2D.cpp|skip|2D path: excluded from the C++ build (`UHE/CMakeLists.txt:12`, `docs/WORK.md`)
 UHE/src/UHE/Renderer2D/Renderer2D.h|skip|2D path: excluded from the C++ build (`UHE/CMakeLists.txt:12`, `docs/WORK.md`)
 UHE/src/UHE/Renderer2D/SubTexture2D.cpp|moved|UHE/src/renderer/src/batch2d.rs|the type itself is not carried: what arrives is the four atlas corners its draw used, as `push_sprite_uv`
@@ -265,18 +265,18 @@ UHE/src/UHE/Utils/PlatfromUtils.h|skip|Win32 `FileDialogs`: no caller needs one,
 UHE/src/UHE/Utils/YamlUtils.h|moved|UHE/src/scene/src/serialize.rs
 UHE/src/uhepch.cpp|skip|precompiled header: Rust has no precompiled-header translation unit, and the crate boundaries are the include graph
 UHE/src/uhepch.h|skip|precompiled header: Rust has no precompiled-header translation unit, and the crate boundaries are the include graph
-UHEGAME/src/AimLabLayer.cpp|moved|UHE/games/aimlab/src/lib.rs + UHE/games/aimlab/src/rules.rs
-UHEGAME/src/AimLabLayer.h|moved|UHE/games/aimlab/src/lib.rs
-UHEGAME/src/GameApp.cpp|moved|UHE/games/aimlab/src/lib.rs
-UHE_EDITOR/src/Editor.cpp|moved|UHE/src/editor/src/lib.rs
-UHE_EDITOR/src/Editor.h|moved|UHE/src/editor/src/lib.rs
-UHE_EDITOR/src/EditorTheme.cpp|moved|UHE/src/editor/src/theme.rs
-UHE_EDITOR/src/EditorTheme.h|moved|UHE/src/editor/src/theme.rs
-UHE_EDITOR/src/Panel/ContentBrowserPanel.cpp|moved|UHE/src/editor/src/content_browser.rs + UHE/bins/editor/src/panels/content_browser.rs
-UHE_EDITOR/src/Panel/ContentBrowserPanel.h|moved|UHE/src/editor/src/content_browser.rs + UHE/bins/editor/src/panels/content_browser.rs
-UHE_EDITOR/src/Panel/SceneHierachyPanel.cpp|moved|UHE/src/editor/src/hierarchy.rs + UHE/bins/editor/src/panels/hierarchy.rs
-UHE_EDITOR/src/Panel/SceneHierachyPanel.h|moved|UHE/src/editor/src/hierarchy.rs + UHE/bins/editor/src/panels/hierarchy.rs
-UHE_EDITOR/src/app.cpp|moved|UHE/bins/editor/src/main.rs
+UHEGAME/src/AimLabLayer.cpp|moved|UHE-AIMLAB/aimlab/src/lib.rs + UHE-AIMLAB/aimlab/src/rules.rs
+UHEGAME/src/AimLabLayer.h|moved|UHE-AIMLAB/aimlab/src/lib.rs
+UHEGAME/src/GameApp.cpp|moved|UHE-AIMLAB/aimlab/src/lib.rs
+UHE_EDITOR/src/Editor.cpp|moved|UHE-EDITOR/mirror/src/lib.rs
+UHE_EDITOR/src/Editor.h|moved|UHE-EDITOR/mirror/src/lib.rs
+UHE_EDITOR/src/EditorTheme.cpp|moved|UHE-EDITOR/mirror/src/theme.rs
+UHE_EDITOR/src/EditorTheme.h|moved|UHE-EDITOR/mirror/src/theme.rs
+UHE_EDITOR/src/Panel/ContentBrowserPanel.cpp|moved|UHE-EDITOR/mirror/src/content_browser.rs + UHE-EDITOR/editor/src/panels/content_browser.rs
+UHE_EDITOR/src/Panel/ContentBrowserPanel.h|moved|UHE-EDITOR/mirror/src/content_browser.rs + UHE-EDITOR/editor/src/panels/content_browser.rs
+UHE_EDITOR/src/Panel/SceneHierachyPanel.cpp|moved|UHE-EDITOR/mirror/src/hierarchy.rs + UHE-EDITOR/editor/src/panels/hierarchy.rs
+UHE_EDITOR/src/Panel/SceneHierachyPanel.h|moved|UHE-EDITOR/mirror/src/hierarchy.rs + UHE-EDITOR/editor/src/panels/hierarchy.rs
+UHE_EDITOR/src/app.cpp|moved|UHE-EDITOR/editor/src/main.rs
 MAP
 }
 

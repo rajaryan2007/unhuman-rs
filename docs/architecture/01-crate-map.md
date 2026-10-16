@@ -35,14 +35,16 @@ UHE/
   src/renderer/      bifrost   renderer frontend, as a Plugin              [new]
   src/audio/         wire      audio backend, as a Plugin                  [new]
   src/physics/       femur     physics backend, as a Plugin                [new]
-  src/editor/        mirror    editor model, toolkit-agnostic, as a Plugin [new]
   Stormbreaker/vulkan/  stormbreaker   Vulkan backend (existing, untouched)
   Stormbreaker/wgpu/    stormglass     wgpu backend (existing; windowed path added)
   bins/nocap/        nocap     headless binary (gpu: None)
   bins/sandbox/      sandbox   windowed binary
-  bins/editor/       editor    GPUI editor binary
-  games/aimlab/      aimlab    the UHEGAME demo layer, ported as a Plugin
   platform/          (docs only)
+
+UHE-EDITOR/                    the editor, kept beside the engine
+  mirror/            mirror    editor model, toolkit-agnostic, as a Plugin [new]
+  editor/            editor    GPUI editor binary
+UHE-AIMLAB/aimlab/   aimlab    the UHEGAME demo layer, ported as a Plugin
 ```
 
 Dependency direction: `pings` ← `eyes`/`vault` ← `meats` ← `adam` ← {`bifrost`, `wire`,
@@ -350,7 +352,7 @@ builds `App` without starting it, and on the first callback does
 ## Ported, deliberately
 
 - `UHE/src/UHE/**` — every module outside `Platform/Vulkan`, which the owner has excused.
-- `UHEGAME/src/*` — as `games/aimlab`.
+- `UHEGAME/src/*` — as `UHE-AIMLAB/aimlab`.
 - Scene files stay `.unhuman` YAML with the C++ field names, so the existing
   `UHE_EDITOR/assets/scene/*.unhuman` load unchanged.
 - The job system, task graph, RHI and render graph are already ported; extend, do not

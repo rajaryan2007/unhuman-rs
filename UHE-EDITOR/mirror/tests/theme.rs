@@ -9,7 +9,10 @@ use mirror::theme::{Rgba, Theme, ThemeId};
 fn reference_theme_file() -> PathBuf {
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
-        .nth(3)
+        .find(|dir| {
+            std::fs::read_to_string(dir.join("Cargo.toml"))
+                .is_ok_and(|text| text.contains("[workspace]"))
+        })
         .expect("workspace root")
         .to_path_buf();
     workspace.join("assets/themes/editor_theme.ini")

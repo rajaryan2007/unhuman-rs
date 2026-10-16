@@ -156,17 +156,20 @@ fn every_declared_member_exists_on_disk() {
 
     let mut checked = 0;
     for line in text.lines() {
+        // A member line is a quoted path ending in `",`. The path is rooted at
+        // the workspace, so it may be under `UHE/` or `UHE-EDITOR/` and the
+        // parse must not assume either.
         let line = line.trim();
-        let Some(rest) = line.strip_prefix("\"UHE/") else {
+        let Some(rest) = line.strip_prefix('"') else {
             continue;
         };
         let Some(path) = rest.strip_suffix("\",") else {
             continue;
         };
-        let directory = root.join("UHE").join(path);
+        let directory = root.join(path);
         assert!(
             directory.join("Cargo.toml").is_file(),
-            "Cargo.toml lists UHE/{path} but it has no Cargo.toml on disk",
+            "Cargo.toml lists {path} but it has no Cargo.toml on disk",
         );
         checked += 1;
     }

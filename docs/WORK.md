@@ -100,12 +100,9 @@ UHE/                        at the repository root, like the C++ tree
     renderer/               bifrost: the renderer frontend, as a Plugin
     audio/                  wire: audio, as a Plugin
     physics/                femur: rigid bodies, as a Plugin
-    editor/                 mirror: the editor model, as a Plugin
   bins/
     nocap/                  headless: gpu: None, fixed steps, exits
     sandbox/                windowed: wgpu, a real swapchain
-    editor/                 gpui over mirror's model, gpui pinned by rev
-  games/aimlab/             the UHEGAME demo layer, as a Plugin
   and chassis (UHE/src/rhi) now owns the *render graph*:
     chassis::graph          types, resources, builder, compiler, facade,
                            and `pass.rs` -- SlotTable, PassScope, PassRecorder,
@@ -114,7 +111,11 @@ UHE/                        at the repository root, like the C++ tree
                            -- moved out of the Vulkan backend, because a wgpu
                               backend that needed the graph would otherwise have
                               to depend on the Vulkan crate. Two backends
-                              depending on each other is a fork waiting to happen.
+                               depending on each other is a fork waiting to happen.
+UHE-EDITOR/                 the editor, kept beside the engine
+  mirror/                   the editor model, as a Plugin
+  editor/                   gpui over mirror's model, gpui pinned by rev
+UHE-AIMLAB/aimlab/          the UHEGAME demo layer, as a Plugin
 ```
 
 Not under `crates/`. That was `crates/UHE/src`, which said `UHE` twice and
@@ -270,7 +271,7 @@ Do not port. Each was measured, not assumed.
 | `UHE/Renderer2D/` | already `EXCLUDE`d from the C++ build (`UHE/CMakeLists.txt:12`) |
 | `Platform/Linux/` | vestigial; `Window::Create` always returns `WindowsWindow` |
 | `Platform/Windows/*` | winit replaces it, on both platforms, from one implementation |
-| `ImGui/*`, `UHE_EDITOR/*` | replaced, not dropped: the model is `mirror`, drawn by gpui in `UHE/bins/editor` |
+| `ImGui/*`, `UHE_EDITOR/*` | replaced, not dropped: the model is `mirror`, drawn by gpui in `UHE-EDITOR/editor` |
 | `box2d` 2D physics | the 3D path is the product; 2D returns when a scene needs it, as a `femur` feature |
 | `vendor/basis_universal` | UASTC transcode needs a C++ toolchain at build time; the KTX2 container is parsed by hand and a supercompressed payload is refused by name |
 | msdf-atlas-gen **runtime** atlas generation | FreeType + msdfgen as a build-time C++ dependency. `vault`/`bifrost` rasterise a coverage atlas with `ab_glyph` and read a pre-baked MSDF atlas when one is present; the shader has both sampling modes |

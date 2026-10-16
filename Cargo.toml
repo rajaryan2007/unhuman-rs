@@ -18,8 +18,8 @@ default-members = [
     "UHE/src/renderer",
     "UHE/src/audio",
     "UHE/src/physics",
-    "UHE/src/editor",
-    "UHE/games/aimlab",
+    "UHE-EDITOR/mirror",
+    "UHE-AIMLAB/aimlab",
     "UHE/bins/nocap",
     "UHE/bins/sandbox",
 ]
@@ -36,11 +36,11 @@ members = [
     "UHE/src/renderer",
     "UHE/src/audio",
     "UHE/src/physics",
-    "UHE/src/editor",
-    "UHE/games/aimlab",
+    "UHE-EDITOR/mirror",
+    "UHE-EDITOR/editor",
+    "UHE-AIMLAB/aimlab",
     "UHE/bins/nocap",
     "UHE/bins/sandbox",
-    "UHE/bins/editor",
     "UHE/Stormbreaker/vulkan",
     "UHE/Stormbreaker/wgpu",
 ]
@@ -48,7 +48,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 repository = "https://github.com/unhuman-engine/unhuman-rs.git"
 
 [workspace.dependencies]
@@ -63,9 +63,9 @@ vault = { path = "UHE/src/assets" }
 bifrost = { path = "UHE/src/renderer" }
 wire = { path = "UHE/src/audio" }
 femur = { path = "UHE/src/physics" }
-mirror = { path = "UHE/src/editor" }
+mirror = { path = "UHE-EDITOR/mirror" }
 engine = { path = "UHE/src/engine" }
-aimlab = { path = "UHE/games/aimlab" }
+aimlab = { path = "UHE-AIMLAB/aimlab" }
 stormbreaker = { path = "UHE/Stormbreaker/vulkan" }
 stormglass = { path = "UHE/Stormbreaker/wgpu" }
 
