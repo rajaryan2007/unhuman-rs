@@ -1,10 +1,9 @@
 //! Input state, fed from the event bus and read by the frame.
 //!
-//! The C++ `Input` polled GLFW directly (`WindowInput.cpp`), so the window's
-//! state and the engine's state were two views of one thing and could disagree
-//! — the ImGui layer read `glfwGetKey`, the game read the event callbacks. Here
-//! there is one `Input`, `pings::Event`s are the only thing that writes to it,
-//! and the window layer never keeps a copy.
+//! Polling the window directly would make the window's state and the engine's
+//! two views of one thing, and they could disagree. Here there is one `Input`,
+//! `pings::Event`s are the only thing that writes to it, and the window layer
+//! never keeps a copy.
 
 use pings::{Event, KeyCode, MouseButton};
 

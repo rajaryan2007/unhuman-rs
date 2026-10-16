@@ -4,8 +4,7 @@ use crate::image::{Image, MipLevel};
 
 /// How a keyframe's interpolation is meant (`glTF` sampler interpolation).
 ///
-/// Port of `InterpolationMode` (`Animation.h:14`). `CubicSpline` carries the
-/// Hermite tangents from the glTF output layout
+/// `CubicSpline` carries the Hermite tangents from the glTF output layout
 /// `[inTangent_i, value_i, outTangent_i]`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Interpolation {
@@ -17,10 +16,8 @@ pub enum Interpolation {
 
 /// One translation or scale curve, targeting a single node.
 ///
-/// Port of `VectorTrack` (`Animation.h:52`), with `Keyframe<T>`'s parallel
-/// `Time`/`Value` members flattened into `times`/`values` because a Rust struct
-/// of two parallel vectors is what a keep-mask wants to index anyway. `target`
-/// is the glTF node index the C++ called `TargetBoneID`.
+/// `times`/`values` are parallel vectors rather than keyframes, because that is
+/// what a keep-mask wants to index anyway. `target` is the glTF node index.
 ///
 /// `in_tangents`/`out_tangents` are parallel to `values` and empty for
 /// `Step`/`Linear` tracks, so those stay compact.
@@ -36,10 +33,9 @@ pub struct VectorTrack {
 
 /// One rotation curve, targeting a single node.
 ///
-/// Port of `QuaternionTrack` (`Animation.h:63`). Values are unit quaternions in
-/// `glTF` order `[x, y, z, w]`; `CubicSpline` tangents are derivatives and are
-/// deliberately *not* normalised (`glTF` 2.0 §animation, and the note at
-/// `LoadModelAnimation.cpp:196`).
+/// Values are unit quaternions in `glTF` order `[x, y, z, w]`; `CubicSpline`
+/// tangents are derivatives and are deliberately *not* normalised (glTF 2.0
+/// animation section).
 #[derive(Clone, Debug, Default)]
 pub struct QuaternionTrack {
     pub target: u32,
@@ -52,9 +48,9 @@ pub struct QuaternionTrack {
 
 /// One animation clip: three lists of curves, a name and a duration.
 ///
-/// Port of `AnimationClip` (`Animation.h:79`). `duration` is the largest input
-/// time across every channel of the clip, which is what playback wraps on and
-/// what the compression tolerances are stated against.
+/// `duration` is the largest input time across every channel of the clip, which
+/// is what playback wraps on and what the compression tolerances are stated
+/// against.
 #[derive(Clone, Debug, Default)]
 pub struct AnimationData {
     pub name: String,
@@ -66,9 +62,8 @@ pub struct AnimationData {
 
 /// One bone of a skin's joint hierarchy.
 ///
-/// Port of `Bone` (`Animation.h:29`). `id` is the index into the owning
-/// [`SkeletonData`]'s `bones`, and equals the glTF node index it came from;
-/// `parent` is -1 at a root.
+/// `id` is the index into the owning [`SkeletonData`]'s `bones`, and equals the
+/// glTF node index it came from; `parent` is -1 at a root.
 #[derive(Clone, Debug)]
 pub struct BoneData {
     pub name: String,
@@ -80,20 +75,19 @@ pub struct BoneData {
 
 /// A joint hierarchy with the inverse bind pose that puts a mesh in it.
 ///
-/// Port of `Skeleton` (`Animation.h:36`), which built one hierarchy across all
-/// nodes and then let each skin bind a subset of it.
+/// One hierarchy is built across all nodes, and each skin binds a subset of it.
 #[derive(Clone, Debug, Default)]
 pub struct SkeletonData {
     pub bones: Vec<BoneData>,
-    /// Joint node indices of the first skin, mirroring the legacy C++ field the
-    /// call sites read.
+    /// Joint node indices of the first skin, so call sites do not need a skin
+    /// lookup.
     pub joints: Vec<i32>,
     pub root: i32,
 }
 
 /// One skin: the joints it binds and their inverse bind matrices.
 ///
-/// Port of `Skin` (`Animation.h:47`). `inverse_bind` is parallel to `joints`.
+/// `inverse_bind` is parallel to `joints`.
 #[derive(Clone, Debug, Default)]
 pub struct SkinData {
     pub name: String,
@@ -132,10 +126,8 @@ pub enum Wrap {
 
 /// The sampler a texture declares, with the `glTF` spec defaults.
 ///
-/// Port of `SamplerDescForTexture` (`LoadModel.cpp:213`): mag LINEAR, min
-/// LINEAR_MIPMAP_LINEAR, REPEAT wrap. A file with no sampler object gets
-/// exactly these, which is also what the backend used before samplers were read
-/// at all.
+/// Mag LINEAR, min LINEAR_MIPMAP_LINEAR, REPEAT wrap. A file with no sampler
+/// object gets exactly these.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct SamplerData {
     pub mag_filter: Filter,
@@ -157,12 +149,11 @@ impl Default for SamplerData {
 
 /// A decoded material texture with the sampler it was declared with.
 ///
-/// The C++ held a `Ref<Texture2D>` here — an uploaded device texture — so the
-/// material list could not exist without a device. The pixels are shared
-/// (`Arc`), because one glTF image is routinely bound by several materials and
-/// slots and the C++ decoded it once per reference until the per-load cache was
-/// added (`LoadModel.cpp:363`). `mips` is the chain the file shipped, empty when
-/// it shipped none: recomputing an authored chain would discard its filter.
+/// Device-free: the pixels live on the CPU, so the material list exists without
+/// a device. The pixels are shared (`Arc`), because one glTF image is routinely
+/// bound by several materials and slots. `mips` is the chain the file shipped,
+/// empty when it shipped none: recomputing an authored chain would discard its
+/// filter.
 #[derive(Clone, Debug)]
 pub struct TextureData {
     pub image: Arc<Image>,
@@ -172,12 +163,11 @@ pub struct TextureData {
 
 /// A material's PBR factors and the five core texture slots.
 ///
-/// Port of the core of `Material` (`LoadModel.h:96`). The optional `KHR_materials_*`
-/// blocks, the specular-glossiness path and `KHR_texture_transform` are **not**
-/// read: the workspace enables `gltf`'s `utils`/`names`/`extensions` features
-/// only, so those accessors do not exist in this build. A file that declares
-/// them still loads; it renders without them, which is what the C++ did for an
-/// extension it had not implemented either.
+/// The optional `KHR_materials_*` blocks, the specular-glossiness path and
+/// `KHR_texture_transform` are **not** read: the workspace enables `gltf`'s
+/// `utils`/`names`/`extensions` features only, so those accessors do not exist
+/// in this build. A file that declares them still loads; it renders without
+/// them.
 #[derive(Clone, Debug)]
 pub struct MaterialData {
     pub name: String,
@@ -185,7 +175,7 @@ pub struct MaterialData {
     pub base_color: [f32; 4],
     pub metallic: f32,
     pub roughness: f32,
-    /// `normalTexture.scale`, spec default 1.0 — a 0.0 default silently
+    /// `normalTexture.scale`, spec default 1.0; a 0.0 default silently
     /// disables every normal map in the scene.
     pub normal_scale: f32,
     /// `occlusionTexture.strength`, spec default 1.0.
@@ -233,16 +223,14 @@ impl Default for MaterialData {
 /// CPU-side geometry for one `glTF` mesh primitive, plus the material and the
 /// model-level animation that goes with it.
 ///
-/// Port of the C++ `Primitive` + `Vertex` pair (`LoadModel.h:52` and `:18`).
 /// One `MeshData` per primitive, not per node: a `glTF` mesh is extracted once
 /// and every node that references it points at the same entry (see
 /// [`ModelNode::primitives`]), which is what keeps repeated props and foliage
 /// from being duplicated per instance.
 ///
-/// The contract's four vertex arrays are `[f32; …]`, so a consumer never has to
-/// know about a math library to read geometry. `joints`/`weights`/`colors` are
-/// additional: a skinned mesh cannot be posed without them, and the C++ carried
-/// them on `Vertex`.
+/// The four vertex arrays are `[f32; ...]`, so a consumer never has to know
+/// about a math library to read geometry. `joints`/`weights`/`colors` are
+/// additional, because a skinned mesh cannot be posed without them.
 ///
 /// `animations` and `skeleton` are model-level facts the contract nevertheless
 /// asks for on `MeshData`. They are filled on the *first* mesh of a model and
@@ -261,9 +249,9 @@ pub struct MeshData {
     pub joints: Vec<[u16; 4]>,
     pub weights: Vec<[f32; 4]>,
     /// True when this primitive carried `COLOR_0`. One fact about the whole
-    /// primitive, which is why the C++ kept it here and not per vertex: the
-    /// shader multiplies vertex colour in only when it is set, and `COLOR_0` is
-    /// linear data that must not be gamma-decoded.
+    /// primitive, not per vertex: the shader multiplies vertex colour in only
+    /// when it is set, and `COLOR_0` is linear data that must not be
+    /// gamma-decoded.
     pub has_vertex_color: bool,
     pub indices: Vec<u32>,
     /// Axis-aligned bounds in the mesh's own space, node transforms not applied.
@@ -276,8 +264,8 @@ pub struct MeshData {
 
 /// One node of the `glTF` scene graph, flattened.
 ///
-/// Port of `ModelNode` (`LoadModel.h:211`, issue #17): the editor turns each
-/// node into a controllable child entity instead of one opaque model.
+/// The editor turns each node into a controllable child entity instead of one
+/// opaque model.
 #[derive(Clone, Debug)]
 pub struct ModelNode {
     pub name: String,
@@ -297,16 +285,15 @@ pub struct ModelNode {
     ///
     /// Deliberately not baked into the vertices: a skinning bone matrix has to
     /// apply on top of it, and rewriting every vertex per instance would defeat
-    /// the geometry sharing. The C++ kept the same field for the same reason
-    /// (`LoadModel.cpp:800`).
+    /// the geometry sharing.
     pub world_transform: [[f32; 4]; 4],
 }
 
 /// Everything about a loaded model that is not per-primitive geometry.
 ///
-/// The C++ `Model` held all of this behind accessors; the pieces the contract
-/// does not put on [`MeshData`] live here so a caller can still reach the node
-/// graph, the skins and the list of extensions the loader did not implement.
+/// The pieces the contract does not put on [`MeshData`] live here so a caller
+/// can still reach the node graph, the skins and the list of extensions the
+/// loader did not implement.
 #[derive(Clone, Debug, Default)]
 pub struct ModelData {
     pub nodes: Vec<ModelNode>,
@@ -315,8 +302,7 @@ pub struct ModelData {
     pub skins: Vec<SkinData>,
     /// Extensions the file declares that this loader does not honour, by name.
     ///
-    /// The C++ reported these at load time (`LoadModel.cpp:163`) because a
-    /// parsed-but-ignored extension makes an asset render with subtly wrong
-    /// shading and no error anywhere.
+    /// Reported at load time because a parsed-but-ignored extension makes an
+    /// asset render with subtly wrong shading and no error anywhere.
     pub unsupported_extensions: Vec<String>,
 }

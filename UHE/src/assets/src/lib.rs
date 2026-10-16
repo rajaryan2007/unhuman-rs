@@ -1,16 +1,11 @@
 //! Asset registry, virtual file system, loaders.
 //!
-//! Port of `UHE/src/UHE/AssestsManager/` (`AssetManager`, `VfsSystem`), the
-//! CPU half of `UHE/src/UHE/Renderer/{Texture,KTX2,Mipmap}` and the
-//! geometry/skin/animation reading of `UHE/src/UHE/Renderer3D/LoadModel*.cpp`.
-//!
-//! The C++ registry was path-based and keyed by payload type
-//! (`Load<TextAsset>("a.txt")`), with an `AssetHandle` that held a
-//! `shared_ptr<AssetRecord>` and compared a generation counter on every
-//! dereference. `IDEA.md:61` calls that debt. Here the registry is the only way
-//! to reach a payload: every asset is an [`AssetId`] (slot index + generation),
-//! a caller asks for the id once with [`Assets::load`], and a stale id is
-//! refused rather than silently aliasing whatever took the slot next.
+//! A path-based registry keyed by payload type, with a handle that held a
+//! `shared_ptr` and compared a generation counter on every dereference, is
+//! replaced here: the registry is the only way to reach a payload. Every asset
+//! is an [`AssetId`] (slot index + generation), a caller asks for the id once
+//! with [`Assets::load`], and a stale id is refused rather than silently
+//! aliasing whatever took the slot next.
 //!
 //! Nothing here names a GPU type. `chassis` is not a dependency of this crate,
 //! so the headless binary links the whole loader set and the editor can decode

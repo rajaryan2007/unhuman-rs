@@ -1,20 +1,18 @@
-//! Port of `UHE::SceneCamera` (`UHE/Scene/SceneCamera.h`) and the bare
-//! `UHE::Camera` it extends (`UHE/Renderer/Camera.h`).
+//! Scene camera: projection type, clipping planes and viewport aspect.
 
 use glam::Mat4;
 
-/// Port of `SceneCamera::ProjectionType`. The discriminants are the C++ ones
-/// (`Perspective` = 0), because the serializer writes the integer.
+/// The discriminants are `Perspective` = 0, because the serializer writes the
+/// integer.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub enum ProjectionType {
     Perspective,
-    /// The C++ default is `Orhtographic` (sic).
+    /// The default projection.
     #[default]
     Orthographic,
 }
 
-/// A camera's projection. The C++ keeps these fields private behind accessors
-/// and caches the matrix; here the matrix is rebuilt on demand, which cannot go
+/// A camera's projection. The matrix is rebuilt on demand, which cannot go
 /// stale and costs a handful of multiplies.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct SceneCamera {
@@ -57,8 +55,8 @@ impl SceneCamera {
         camera
     }
 
-    /// `glm::perspective` / `glm::ortho`, right-handed with a `[-1, 1]` depth
-    /// range — glam spells those `camera::rh::proj::opengl`.
+    /// Right-handed with a `[-1, 1]` depth range; glam spells those
+    /// `camera::rh::proj::opengl`.
     pub fn projection(&self) -> Mat4 {
         let aspect = self.effective_aspect_ratio();
         match self.projection_type {
@@ -177,9 +175,9 @@ impl SceneCamera {
         self.orthographic_far = far;
     }
 
-    /// The C++ divides width by height with no guard, so a zero-height viewport
-    /// makes the projection non-finite. A camera that has never been given a
-    /// viewport (aspect 0) falls back to square rather than to NaN.
+    /// A zero-height viewport would make the projection non-finite, so a camera
+    /// that has never been given a viewport (aspect 0) falls back to square
+    /// rather than NaN.
     fn effective_aspect_ratio(&self) -> f32 {
         if self.aspect_ratio.is_finite() && self.aspect_ratio > 0.0 {
             self.aspect_ratio
@@ -197,7 +195,8 @@ fn aspect_ratio_of(width: f32, height: f32) -> f32 {
     }
 }
 
-/// Port of `CameraComponent`.
+/// A render camera: its projection, whether it is primary, and whether the
+/// aspect ratio is fixed.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Camera {
     pub camera: SceneCamera,

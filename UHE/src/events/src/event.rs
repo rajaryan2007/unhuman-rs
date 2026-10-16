@@ -2,8 +2,8 @@ use crate::{KeyCode, MouseButton};
 
 /// One thing that happened, in the order the platform reported it.
 ///
-/// The C++ has a class per event (`UHE/src/UHE/Events/*.h`) plus an `EventType`
-/// tag to dispatch on; one enum carries the same payloads.
+/// One enum carries every payload, rather than a class per event plus a tag to
+/// dispatch on.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     WindowResized {
@@ -13,7 +13,7 @@ pub enum Event {
     WindowCloseRequested,
     /// Focus gained (`true`) or lost (`false`).
     WindowFocused(bool),
-    /// `repeat` is an auto-repeat, the C++ `repeatCount != 0`.
+    /// `repeat` is an auto-repeat.
     KeyPressed {
         key: KeyCode,
         repeat: bool,
@@ -22,7 +22,7 @@ pub enum Event {
         key: KeyCode,
     },
     /// The characters a key produced, separate from the press that produced
-    /// them: the ImGui layer consumed the character, not the key.
+    /// them.
     TextInput(String),
     MouseButtonPressed(MouseButton),
     MouseButtonReleased(MouseButton),

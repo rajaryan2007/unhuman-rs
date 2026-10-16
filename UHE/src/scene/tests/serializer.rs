@@ -1,4 +1,4 @@
-//! The `.unhuman` YAML round trip, and the C++ scenes it has to read.
+//! The `.unhuman` YAML round trip, and the shipped scenes it has to read.
 
 use std::path::Path;
 
@@ -21,9 +21,8 @@ fn entity_named(scene: &Scene, tag: &str) -> Entity {
         .unwrap_or_else(|| panic!("no entity tagged `{tag}`"))
 }
 
-/// One of every component this crate ports. `NativeScript` is absent because a
-/// `Box<dyn Script>` has no serialized form — the C++ serializer skips
-/// `NativeScriptComponent` for the same reason.
+/// One of every component. `NativeScript` is absent because a
+/// `Box<dyn Script>` has no serialized form.
 fn every_component_scene() -> Scene {
     let mut scene = Scene::new();
     scene.set_name("Round Trip");
@@ -416,9 +415,9 @@ fn load_and_save_go_through_the_filesystem() {
 
 #[test]
 fn loads_the_shipped_cpp_cube_scene() {
-    // `assets/scenes/cube.unhuman` is `UNHUMAN/UHE_EDITOR/assets/scene/cube.unhuman`
-    // verbatim (byte-identical), copied in so the test does not need the C++
-    // checkout beside the workspace.
+    // `assets/scenes/cube.unhuman` is a verbatim (byte-identical) copy of
+    // `UNHUMAN/UHE_EDITOR/assets/scene/cube.unhuman`, so the test does not need
+    // that checkout beside the workspace.
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/scenes/cube.unhuman");
     let scene = load(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
 
@@ -443,7 +442,7 @@ fn loads_the_shipped_cpp_cube_scene() {
     assert_eq!(sprite.color, Vec4::new(0.0, 1.0, 1.0, 1.0));
 
     // `cube.unhuman` repeats id 2323232 on every entity, so the loader keeps it
-    // on the first and hands out fresh ones for the rest — the file has to stay
+    // on the first and hands out fresh ones for the rest; the file has to stay
     // loadable, and the entities have to stay distinct.
     let ids: Vec<u64> = scene
         .entities()

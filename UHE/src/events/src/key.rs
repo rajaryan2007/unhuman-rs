@@ -1,7 +1,6 @@
-//! Key and mouse codes, named after `UHE/src/UHE/Core/keyCodes.h` and
-//! `mouseButtonCodes.h`. The C++ constants are the GLFW codes verbatim; the
-//! variants keep the names, not the numbers, because nothing outside the
-//! platform layer ever compared them numerically.
+//! Key and mouse codes. The constants are the GLFW codes verbatim; the variants
+//! keep the names, not the numbers, because nothing outside the platform layer
+//! ever compared them numerically.
 
 /// A physical key.
 ///
@@ -141,8 +140,8 @@ pub enum KeyCode {
     Unknown(u32),
 }
 
-/// The mouse buttons `mouseButtonCodes.h` names. C++ buttons 1..8 start at 1
-/// (GLFW); the raw number of anything past the three named buttons is kept.
+/// The named mouse buttons. GLFW buttons 1..8 start at 1; the raw number of
+/// anything past the three named buttons is kept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MouseButton {
     Left,

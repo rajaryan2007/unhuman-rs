@@ -1,4 +1,4 @@
-//! `winit` → `pings`. The only place the two vocabularies meet.
+//! `winit` -> `pings`. The only place the two vocabularies meet.
 //!
 //! Every key `pings::KeyCode` names is mapped by hand, one arm each, so a
 //! missing arm is visible rather than caught by a wildcard. What is left over
@@ -205,8 +205,7 @@ fn key(code: WinitKeyCode) -> KeyCode {
     }
 }
 
-/// GLFW's button numbering, which the C++ handed straight to the event: 3 is
-/// back, 4 is forward.
+/// GLFW's button numbering: 3 is back, 4 is forward.
 fn mouse_button(button: WinitMouseButton) -> MouseButton {
     match button {
         WinitMouseButton::Left => MouseButton::Left,

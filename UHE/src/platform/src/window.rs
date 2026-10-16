@@ -1,9 +1,8 @@
 //! The window, and the loop that owns the process.
 //!
 //! `winit` 0.30 runs the event loop itself, so the engine cannot own a `while`
-//! loop the way the C++ did (`glfwPollEvents` inside `WindowsWindow::OnUpdate`).
-//! A frame is a callback here, and that is the whole shape of this file: an
-//! [`ApplicationHandler`] that creates one window on `resumed` and calls the
+//! loop. A frame is a callback here, and that is the whole shape of this file:
+//! an [`ApplicationHandler`] that creates one window on `resumed` and calls the
 //! caller's closure once per frame.
 
 use std::fmt;
@@ -19,8 +18,8 @@ use winit::window::{CursorGrabMode, Window, WindowAttributes, WindowId};
 
 use crate::translate;
 
-/// What the window is created with: the C++ `WindowProps`, plus the vsync flag
-/// the C++ kept in its window data and the swapchain is what consumes.
+/// What the window is created with, including the vsync flag the swapchain
+/// consumes.
 pub struct WindowDesc {
     pub title: String,
     pub width: u32,
@@ -88,7 +87,7 @@ pub trait WindowExt {
 
     fn request_close(&self);
 
-    /// Hide and grab the cursor, the C++ `SetCursorLocked`, for FPS mouse look.
+    /// Hide and grab the cursor, for FPS mouse look.
     fn set_cursor_locked(&self, locked: bool);
 }
 

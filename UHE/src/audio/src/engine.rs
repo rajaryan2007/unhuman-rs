@@ -1,11 +1,7 @@
 //! The audio engine, and the plugin that installs it.
 //!
-//! The C++ split this in two: `AudioEngine` was a facade of statics that forwarded
-//! to `MiniAudioBackend`, which owned the device in file-scope globals
-//! (`s_AudioEngine`, `s_ActiveSounds`) — so nothing but `Application` could ever
-//! have an audio engine, and nothing could be tested without a device. Here one
-//! owner holds the voices and the clip table, the device is an `Option`, and the
-//! bookkeeping runs with the `Option` empty.
+//! One owner holds the voices and the clip table, and the device is an `Option`, so
+//! the bookkeeping runs with the `Option` empty and is testable without a sound card.
 
 use glam::Vec3;
 
@@ -87,7 +83,7 @@ impl AudioEngine {
         self.sounds.resolve(assets, asset)
     }
 
-    /// Play a clip from nowhere in particular: the C++ `PlaySound2D(filepath, volume, loop)`.
+    /// Play a clip with no position, so no falloff or panning.
     pub fn play_2d(
         &mut self,
         assets: &Assets,
@@ -106,8 +102,7 @@ impl AudioEngine {
         )
     }
 
-    /// Play a clip at a world position: the C++ `PlaySound3D(filepath, position, volume, loop)`,
-    /// which spatialised through miniaudio's engine and never knew the listener.
+    /// Play a clip at a world position, spatialised against the listener.
     pub fn play_3d(
         &mut self,
         assets: &Assets,
@@ -331,8 +326,7 @@ impl Plugin for WirePlugin {
 
     /// Once a frame, not once per fixed step: the listener follows the camera, which
     /// moves per frame, and a frame whose accumulator reached no step runs no
-    /// substeps at all. The C++ called `AudioEngine::Update()` from the frame loop
-    /// for the same reason.
+    /// substeps at all.
     fn on_frame(&mut self, eng: &mut Engine, _ctx: &mut FrameCtx) {
         let Some(audio) = eng.audio.as_mut() else {
             return;
@@ -342,8 +336,7 @@ impl Plugin for WirePlugin {
     }
 }
 
-/// The primary camera's pose as the ear — what the C++ game layer did every frame
-/// with `SetListenerPosition(camera.GetPosition(), forward, up)`.
+/// The primary camera's pose as the ear.
 pub fn listener_from(scene: &Scene) -> Listener {
     let Some(camera) = scene.primary_camera() else {
         return Listener::default();

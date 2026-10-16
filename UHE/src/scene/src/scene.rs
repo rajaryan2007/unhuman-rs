@@ -1,8 +1,8 @@
 //! The scene: a `hecs::World` plus the single-parent hierarchy, the generational
 //! entity slot map, and the per-frame world-transform cache.
 //!
-//! Port of `UHE::Scene` (`UHE/Scene/Scene.cpp`), minus everything that belonged
-//! to a renderer, a physics world or the editor: those are plugins here.
+//! Renderer, physics world and editor state are not part of it: those are
+//! plugins here.
 
 use std::collections::HashMap;
 
@@ -16,13 +16,12 @@ use crate::components::{
 };
 use crate::entity::{Entity, EntityRef, EntityRefMut};
 
-/// Every C++ parent walk carried this guard so a corrupt hierarchy could not
-/// spin forever. Cycles are refused on the way in now, but a loaded file can
-/// still contain one, so the walks keep it.
+/// Cycles are refused on the way in, but a loaded file can still contain one,
+/// so the walks cap their depth rather than spin forever.
 const MAX_DEPTH: usize = 4096;
 
-/// A light as a renderer wants it: world-space, with the direction the C++ light
-/// system computed.
+/// A light as a renderer wants it: world-space, with the direction the entity's
+/// rotation gives local -Z.
 #[derive(Clone, Copy, Debug)]
 pub struct LightSample {
     pub entity: Entity,
@@ -49,7 +48,7 @@ pub struct MeshSample {
     pub cast_shadows: bool,
 }
 
-/// A path the registry could not resolve. Recorded, never a panic — a scene that
+/// A path the registry could not resolve. Recorded, never a panic: a scene that
 /// references a deleted asset still loads and still renders the rest.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AssetError {
@@ -96,8 +95,8 @@ pub struct Scene {
     entities: HashMap<hecs::Entity, Entity>,
     parents: HashMap<Entity, Entity>,
     children: HashMap<Entity, Vec<Entity>>,
-    /// `Id` -> `Entity`, the C++ `m_UUIDIndex`. Hierarchy and the serializer
-    /// resolve ids through this instead of scanning components.
+    /// `Id` -> `Entity`. Hierarchy and the serializer resolve ids through this
+    /// instead of scanning components.
     id_index: HashMap<u64, Entity>,
     /// Rebuilt by [`Scene::update_transforms`]; consulted by
     /// [`Scene::world_transform`] and invalidated by every structural change.
@@ -139,7 +138,7 @@ impl Scene {
 
     // --- entities ---------------------------------------------------------
 
-    /// Port of `Scene::CreateEntity`: an `Id`, a `Tag` and a `Transform`.
+    /// Spawns an entity with an `Id`, a `Tag` and a `Transform`.
     pub fn spawn(&mut self, name: &str) -> Entity {
         let id = self.next_unique_id();
         let tag = if name.is_empty() { "Entity" } else { name };
@@ -152,12 +151,12 @@ impl Scene {
         entity
     }
 
-    /// Port of `Scene::DestroyEntity`: the whole subtree goes, and every script
-    /// gets `on_destroy` while its components are still readable.
+    /// Destroys the whole subtree, and every script gets `on_destroy` while its
+    /// components are still readable.
     pub fn destroy(&mut self, entity: Entity) {
         let mut doomed = Vec::new();
         self.collect_subtree(entity, &mut doomed);
-        // Children first, as the C++ recursive lambda did.
+        // Children first, so a parent is never destroyed before its child.
         for doomed in doomed.into_iter().rev() {
             self.destroy_one(doomed);
         }
@@ -181,7 +180,7 @@ impl Scene {
     }
 
     /// Every live entity, ordered by slot index so two calls with no mutation in
-    /// between agree — a render graph that sees a different pass list each frame
+    /// between agree; a render graph that sees a different pass list each frame
     /// is a render graph that cannot compile.
     pub fn entities(&self) -> Vec<Entity> {
         let mut entities: Vec<Entity> = self.entities.values().copied().collect();
@@ -242,9 +241,8 @@ impl Scene {
         }
     }
 
-    /// Add or replace a component. Port of `Entity::AddComponent`, including
-    /// `OnComponentAdded<CameraComponent>`, which hands a fresh camera the
-    /// viewport it was created in.
+    /// Add or replace a component. A fresh camera is handed the viewport it was
+    /// created in.
     pub fn insert<T: hecs::Component>(&mut self, entity: Entity, mut component: T) -> bool {
         let Some(hecs) = self.hecs_of(entity) else {
             return false;
@@ -262,8 +260,8 @@ impl Scene {
         self.world.insert_one(hecs, component).is_ok()
     }
 
-    /// Port of `Entity::RemoveComponent`. Removing a script runs its
-    /// `on_destroy` first — the C++ `RemoveComponent` leaked the instance.
+    /// Removing a script runs its `on_destroy` first, so the instance is not
+    /// dropped without notice.
     pub fn remove<T: hecs::Component>(&mut self, entity: Entity) -> Option<T> {
         let hecs = self.hecs_of(entity)?;
         let mut removed = self.world.remove_one::<T>(hecs).ok()?;
@@ -276,14 +274,14 @@ impl Scene {
 
     // --- hierarchy --------------------------------------------------------
 
-    /// Attach `child` under `parent` keeping its **local** transform, which is
-    /// the C++ `AttachChildEntity`. A cycle is refused, with a warning.
+    /// Attach `child` under `parent` keeping its **local** transform. A cycle is
+    /// refused, with a warning.
     pub fn set_parent(&mut self, child: Entity, parent: Option<Entity>) {
         self.attach(child, parent, false);
     }
 
-    /// The C++ `ReparentEntity`: keep the entity where it is in the world while
-    /// switching parents. This is what an editor drag-drop wants.
+    /// Keep the entity where it is in the world while switching parents, which
+    /// is what an editor drag-drop wants.
     pub fn set_parent_preserving_world(&mut self, child: Entity, parent: Option<Entity>) {
         self.attach(child, parent, true);
     }
@@ -321,8 +319,8 @@ impl Scene {
         }
     }
 
-    /// Port of `Scene::UpdateWorldTransformCache`. Called once per frame; a
-    /// second call with no mutation in between produces the same cache.
+    /// Called once per frame; a second call with no mutation in between
+    /// produces the same cache.
     pub fn update_transforms(&mut self) {
         self.world_cache.clear();
 
@@ -353,8 +351,7 @@ impl Scene {
         }
     }
 
-    /// Port of `Scene::OnViewportResize`: cameras that do not pin their aspect
-    /// take the new one.
+    /// Cameras that do not pin their aspect take the new viewport size.
     pub fn set_viewport_size(&mut self, width: u32, height: u32) {
         self.viewport = (width, height);
         for entity in self.entities() {
@@ -371,7 +368,7 @@ impl Scene {
 
     // --- queries ----------------------------------------------------------
 
-    /// Port of `Scene::GetPrimaryCameraEntity`.
+    /// The first entity carrying a primary [`Camera`].
     pub fn primary_camera(&self) -> Option<Entity> {
         self.entities().into_iter().find(|entity| {
             self.hecs_of(*entity)
@@ -380,10 +377,9 @@ impl Scene {
         })
     }
 
-    /// Port of `LightSystem::ExtractLights` for the scene's own light
-    /// components. Disabled lights and entities with no transform are skipped;
-    /// the direction is the entity's world rotation applied to local -Z, the axis
-    /// the C++ light system used.
+    /// Extracts the scene's own light components. Disabled lights and entities
+    /// with no transform are skipped; the direction is the entity's world
+    /// rotation applied to local -Z, the light axis.
     pub fn lights(&self) -> Vec<LightSample> {
         let mut lights = Vec::new();
         for entity in self.entities() {
@@ -493,8 +489,7 @@ impl Scene {
 
     // --- scripts ----------------------------------------------------------
 
-    /// Port of the `NativeScriptComponent` half of `Scene::OnUpdateRuntime`:
-    /// `on_create` on the first call for an entity, then `on_update`.
+    /// Runs `on_create` on the first call for an entity, then `on_update`.
     ///
     /// The script is moved out of the world for the duration of the call, because
     /// a hook takes `&mut Scene` and the component lives in that scene.
@@ -674,7 +669,7 @@ impl Scene {
         self.world_cache.clear();
     }
 
-    /// Port of `Scene::SetLocalTransformFromWorld`.
+    /// Rewrites the local transform so the entity keeps the given world matrix.
     fn set_local_transform_from_world(&mut self, entity: Entity, world: Mat4) {
         if !self.has::<Transform>(entity) {
             return;
@@ -749,19 +744,17 @@ impl std::fmt::Debug for Scene {
 }
 
 impl Drop for Scene {
-    /// Port of `~Scene` -> `DestroyScriptInstances`: a script's `on_destroy` runs
-    /// even when the scene is simply dropped. Rust frees the box either way; this
-    /// is about the callback.
+    /// A script's `on_destroy` runs even when the scene is simply dropped. Rust
+    /// frees the box either way; this is about the callback.
     fn drop(&mut self) {
         self.destroy_all_scripts();
     }
 }
 
 impl Clone for Scene {
-    /// Port of `Scene::Copy`, used for play-mode snapshots. The hierarchy and
-    /// every component come across; `NativeScript` does not, because
-    /// `Box<dyn Script>` cannot be cloned — the C++ copy left `Instance` null for
-    /// the same reason and let the copy's runtime instantiate its own.
+    /// Used for play-mode snapshots. The hierarchy and every component come
+    /// across; `NativeScript` does not, because `Box<dyn Script>` cannot be
+    /// cloned, so the copy's runtime instantiates its own.
     fn clone(&self) -> Self {
         let mut clone = Scene::new();
         clone.name = self.name.clone();
@@ -863,10 +856,10 @@ fn seed_id() -> u64 {
     nanos | 1
 }
 
-/// The inverse of [`Transform::rotation_quat`]: hand-written because glam's
-/// `EulerRot` sequences do not reproduce the C++ `glm::quat(vec3)` order.
+/// The inverse of [`Transform::rotation_quat`], returned in degrees.
 ///
-/// `glm::eulerAngles` from `glm/gtx/quaternion.hpp`, returned in degrees.
+/// Hand-written because glam's `EulerRot` sequences do not reproduce the
+/// X-then-Y-then-Z order.
 pub fn euler_degrees(rotation: Quat) -> Vec3 {
     let (x, y, z, w) = (rotation.x, rotation.y, rotation.z, rotation.w);
     let pitch = (2.0 * (y * z + w * x)).atan2(w * w - x * x - y * y + z * z);

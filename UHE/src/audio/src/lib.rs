@@ -1,16 +1,13 @@
 //! Audio: the mixer, the backend, spatialisation.
 //!
-//! Ported from `UHE/src/UHE/Audio/`, where `AudioEngine` was a facade of statics
-//! forwarding to `MiniAudioBackend`, which kept `ma_engine` and a
-//! `std::vector<ma_sound*> s_ActiveSounds` in file scope. Here [`AudioEngine`] owns
-//! the voices and the clip table, [`backend::Backend`] owns the rodio device, and
-//! [`WirePlugin`] installs the engine into `Engine::audio`.
+//! [`AudioEngine`] owns the voices and the clip table, [`backend::Backend`] owns the
+//! rodio device, and [`WirePlugin`] installs the engine into `Engine::audio`.
 //!
-//! Two behaviours differ from the C++ because the C++ left them to a library
-//! default. Attenuation is linear over the source's `range`: miniaudio's default
-//! inverse falloff with `maxDistance = FLT_MAX` only reaches silence at infinity, so
-//! a spatial source had no volume it could be inaudible at. And the number of
-//! simultaneous voices is bounded, where `s_activeSounds` grew until a sound ended.
+//! Two behaviours are chosen rather than left to a library default. Attenuation is
+//! linear over the source's `range`, because miniaudio's default inverse falloff with
+//! `maxDistance = FLT_MAX` only reaches silence at infinity, leaving a spatial source
+//! no volume it could be inaudible at. And the number of simultaneous voices is
+//! bounded, where an unbounded table would grow until a sound ended.
 
 pub mod backend;
 pub mod engine;

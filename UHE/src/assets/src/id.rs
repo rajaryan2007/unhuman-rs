@@ -9,12 +9,11 @@ use crate::mesh::{MeshData, ModelData};
 /// A stable reference to a registered asset: slot index plus the generation the
 /// slot was handed out at.
 ///
-/// The counterpart of the C++ `AssetID` (`AssetID.h`), which was a 64-bit UUID
-/// used as a map key: nothing about it said which slot it meant, so a stale id
-/// and a live id were indistinguishable and a freed asset's id could be reused
-/// by a new UUID with no way to tell. Here the generation is compared on every
-/// dereference, so an id from before a release resolves to nothing instead of
-/// aliasing the asset that took its slot.
+/// A UUID used as a map key would say nothing about which slot it meant, so a
+/// stale id and a live id would be indistinguishable and a freed asset's id
+/// could be reused with no way to tell. Here the generation is compared on
+/// every dereference, so an id from before a release resolves to nothing
+/// instead of aliasing the asset that took its slot.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AssetId {
     index: u32,
@@ -32,8 +31,8 @@ impl AssetId {
 
     /// Packs a slot index and a generation into an id.
     ///
-    /// Public because a table keyed by `AssetId` — the audio backend's sound
-    /// table is one — has to be tested without an `Assets` to create ids from.
+    /// Public because a table keyed by `AssetId` (the audio backend's sound
+    /// table is one) has to be tested without an `Assets` to create ids from.
     /// A fabricated id resolves to nothing unless it happens to match a live
     /// slot's generation, which is the same answer a released asset gives.
     pub const fn from_parts(index: u32, generation: u32) -> Self {
@@ -71,13 +70,12 @@ impl fmt::Debug for AssetId {
 
 /// What a registered asset holds, which decides the accessor that resolves it.
 ///
-/// The C++ tagged this on the payload with `AssetTraits<T>::Type` and picked the
-/// loader from it. The kinds are the ones a caller can actually ask for; there
-/// is no `None` (a slot with no kind does not exist) and no separate kind per
-/// image encoding, because the crate decodes to one [`Image`] either way.
+/// The kinds are the ones a caller can actually ask for; there is no `None` (a
+/// slot with no kind does not exist) and no separate kind per image encoding,
+/// because the crate decodes to one [`Image`] either way.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum AssetKind {
-    /// UTF-8 text: `.json`, `.slang`, `.unhuman`, … Resolved by [`Assets::text`].
+    /// UTF-8 text: `.json`, `.slang`, `.unhuman`, ... Resolved by [`Assets::text`].
     Text,
     /// Opaque bytes with no decoder. Resolved by [`Assets::bytes`].
     Binary,
@@ -92,10 +90,10 @@ pub enum AssetKind {
 ///
 /// `T` is the payload, so a `Handle<Image>` cannot be passed where a
 /// `Handle<MeshData>` is expected and `get` cannot return the wrong payload.
-/// The handle does not keep the asset alive — the C++ refcount did, at the cost
-/// of a slot that could never be reclaimed while any stale handle existed
-/// (`AssetManager::UnloadUnused`). Here the registry owns every payload and a
-/// released asset is gone for every handle at once.
+/// The handle does not keep the asset alive: a refcount would, at the cost of a
+/// slot that could never be reclaimed while any stale handle existed. Here the
+/// registry owns every payload and a released asset is gone for every handle at
+/// once.
 #[derive(Debug)]
 pub struct Handle<T: ?Sized> {
     id: AssetId,

@@ -10,7 +10,7 @@ use glam::Vec3;
 use meats::{AudioSource, Scene};
 use wire::{attenuation, channel_gains, pan, Listener, SoundId, VoicePool, VoiceSpec};
 
-/// A scene component as `meats` stores it. `clip` is `None` — the resolver in these
+/// A scene component as `meats` stores it. `clip` is `None` -- the resolver in these
 /// tests answers for any source, which is what the engine's resolver does once
 /// `vault` has the bytes.
 fn source(playing: bool) -> AudioSource {

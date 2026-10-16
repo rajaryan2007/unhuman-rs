@@ -4,9 +4,8 @@ use crate::mesh::{AnimationData, QuaternionTrack, VectorTrack};
 
 /// Keyframe reduction tolerances, in the units each track is measured in.
 ///
-/// Port of `CompressSettings` (`AnimationCompression.h:24`): translations and
-/// scales are compared by Euclidean distance, rotations by angular difference
-/// in radians.
+/// Translations and scales are compared by Euclidean distance, rotations by
+/// angular difference in radians.
 #[derive(Clone, Copy, Debug)]
 pub struct CompressSettings {
     pub position_tolerance: f32,
@@ -28,9 +27,9 @@ impl Default for CompressSettings {
 
 /// What a reduction pass did, in keys and in bytes.
 ///
-/// Port of `CompressionStats` (`AnimationCompression.h:33`). The byte figures
-/// count the stride this crate stores a key in — an `f32` time plus the value,
-/// and one value per tangent — which is the layout a renderer uploads.
+/// The byte figures count the stride this crate stores a key in: an `f32` time
+/// plus the value, and one value per tangent, which is the layout a renderer
+/// uploads.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CompressionStats {
     pub keys_before: usize,
@@ -66,12 +65,11 @@ impl CompressionStats {
     }
 }
 
-/// Greedy key reduction over one clip, in place. Port of
-/// `AnimationCompressor::CompressClip` (`AnimationCompression.cpp:196`).
+/// Greedy key reduction over one clip, in place.
 ///
 /// `CubicSpline` and `Step` tracks are measured but never reduced: a step
-/// track's semantics change if an interior key is dropped, and the C++ only
-/// reduced tracks that interpolate linearly.
+/// track's semantics change if an interior key is dropped, so only tracks that
+/// interpolate linearly are reduced.
 pub fn compress(clip: &mut AnimationData, settings: CompressSettings) -> CompressionStats {
     let mut stats = CompressionStats::default();
     for track in &mut clip.position_tracks {
@@ -114,11 +112,11 @@ pub fn compress(clip: &mut AnimationData, settings: CompressSettings) -> Compres
 }
 
 /// The same measurement without changing the clip, so a caller can decide
-/// whether compressing is worth it. Port of `AnimationCompressor::MeasureClip`.
+/// whether compressing is worth it.
 ///
-/// The mask is computed on the real key values with `apply` left off, which is
-/// what the C++ achieved by cloning the clip and running the same pass: a
-/// measurement that disagreed with the compression would be worse than none.
+/// The mask is computed on the real key values with `apply` left off, which
+/// keeps measurement and compression in agreement; a measurement that disagreed
+/// with the compression would be worse than none.
 pub fn measure(clip: &AnimationData, settings: CompressSettings) -> CompressionStats {
     let mut stats = CompressionStats::default();
     for track in &clip.position_tracks {
@@ -236,9 +234,9 @@ fn is_spline<T>(keys: usize, in_tangents: &[T], out_tangents: &[T]) -> bool {
 /// straight blend from the last kept key to the next original key would deviate
 /// from the original by more than `tolerance`.
 ///
-/// Port of `ComputeKeepMask` (`AnimationCompression.cpp:88`). Every key that is
-/// dropped was checked against the final segment that spans it, so the reduced
-/// track is within `tolerance` of the original at every original sample time.
+/// Every key that is dropped was checked against the final segment that spans
+/// it, so the reduced track is within `tolerance` of the original at every
+/// original sample time.
 fn keep_mask<T: TrackValue>(
     times: &[f32],
     values: &[T],
@@ -292,7 +290,7 @@ fn keep_mask<T: TrackValue>(
 
 /// Value the track takes at `time` when jumping straight from key `a` to key
 /// `b`: linear for `Linear` tracks, one long Hermite segment for `CubicSpline`
-/// tracks. Port of `SampleBetween` (`AnimationCompression.cpp:42`).
+/// tracks.
 fn sample_between<T: TrackValue>(a: (f32, T, T), b: (f32, T, T), spline: bool, time: f32) -> T {
     let (a_time, a_value, a_out) = a;
     let (b_time, b_value, b_in) = b;
@@ -324,10 +322,9 @@ fn apply_mask<T: Copy>(values: &mut Vec<T>, keep: &[usize]) {
 
 /// A value a track can hold, with the two operations the reduction needs.
 ///
-/// This is the `template <typename T>` of `AnimationCompression.cpp` spelled
-/// out for the two types glTF actually has. Rotations are unit quaternions in
-/// `[x, y, z, w]` order and are blended on the sphere; vectors are blended
-/// component-wise.
+/// Spelled out for the two types glTF actually has. Rotations are unit
+/// quaternions in `[x, y, z, w]` order and are blended on the sphere; vectors
+/// are blended component-wise.
 pub(crate) trait TrackValue: Copy {
     const ZERO: Self;
 
@@ -463,9 +460,8 @@ pub(crate) fn slerp(a: [f32; 4], b: [f32; 4], u: f32) -> [f32; 4] {
 /// times are the keyframe times, the segment is found by the first key after
 /// `time`, and `Step` holds the previous value, `Linear` blends, `CubicSpline`
 /// runs one Hermite segment with the keys' tangents scaled by its duration.
-/// The C++ runtime sampler lives in `Animator.cpp`; this is the same convention
-/// in the loader's own data so a compressed clip can be checked where it is
-/// made.
+/// The convention lives in the loader's own data so a compressed clip can be
+/// checked where it is made.
 impl VectorTrack {
     pub fn sample(&self, time: f32) -> [f32; 3] {
         sample_value(

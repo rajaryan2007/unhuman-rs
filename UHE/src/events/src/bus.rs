@@ -13,10 +13,9 @@ struct Subscriber {
 
 /// Events waiting for the frame, and the handlers watching them as they arrive.
 ///
-/// The C++ `Application::OnEvent` (`Core/Application.cpp:83`) walks the layer
-/// stack until a layer sets `Handled`; a subscription decides for itself whether
-/// it cares, so the flag and the category bitmask it was tested with have no
-/// counterpart here.
+/// A subscription decides for itself whether it cares, rather than a walk of the
+/// layer stack until one sets `Handled`, so neither the flag nor a category
+/// bitmask has a counterpart here.
 #[derive(Default)]
 pub struct EventBus {
     events: VecDeque<Event>,

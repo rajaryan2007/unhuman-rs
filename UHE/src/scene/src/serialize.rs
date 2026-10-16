@@ -1,10 +1,10 @@
-//! The `.unhuman` serializer: the C++ YAML format, read and written.
+//! The `.unhuman` serializer: the YAML format, read and written.
 //!
-//! Field names are the C++ ones (`SceneSerializer.cpp`), so the scenes in
-//! `UNHUMAN/UHE_EDITOR/assets/scene/*.unhuman` load unchanged and a file this
-//! port writes is one the C++ editor can still read. The one addition is a
-//! `*Path` string beside every asset handle, because a `vault::AssetId` cannot
-//! be rebuilt from a file without the registry that issued it.
+//! Field names are the established ones, so the scenes in
+//! `UNHUMAN/UHE_EDITOR/assets/scene/*.unhuman` load unchanged and a file
+//! written here keeps that layout. The one addition is a `*Path` string beside
+//! every asset handle, because a `vault::AssetId` cannot be rebuilt from a file
+//! without the registry that issued it.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -79,8 +79,7 @@ pub fn to_yaml(scene: &Scene) -> Result<String> {
     root.insert(key("Scene"), Value::String(scene.name().to_string()));
 
     // Roots and their subtrees first, then a sweep for anything the hierarchy
-    // did not reach — the C++ serializer's two passes, so no live entity can
-    // silently vanish from a save.
+    // did not reach, so no live entity can silently vanish from a save.
     let mut entities = Vec::new();
     let mut written = HashSet::new();
     for entity in scene.entities() {
@@ -139,9 +138,9 @@ pub fn from_yaml(text: &str) -> Result<Scene> {
         if let Some(id) = node.get("Entity").and_then(Value::as_u64) {
             if id != 0 {
                 if scene.id_is_taken(id) {
-                    // The shipped C++ scenes repeat one id on every entity;
-                    // refusing the file would make them unloadable, and the
-                    // hierarchy below needs distinct ids to mean anything.
+                    // Shipped scenes repeat one id on every entity; refusing
+                    // the file would make them unloadable, and the hierarchy
+                    // below needs distinct ids to mean anything.
                     log::warn!("meats: duplicate Entity id {id}; a fresh id was assigned");
                 } else {
                     scene.set_id(entity, id);
@@ -152,7 +151,7 @@ pub fn from_yaml(text: &str) -> Result<Scene> {
     }
 
     // Pass 2: components, then the parent links. `set_parent` refuses a cycle
-    // and ignores a dangling parent, which is the C++ post-load sanitizing.
+    // and ignores a dangling parent.
     for (node, entity) in entities.iter().zip(&created) {
         read_components(&mut scene, *entity, node);
         if let Some(parent) = node
@@ -294,8 +293,8 @@ fn entity_value(scene: &Scene, entity: Entity) -> Value {
         c.insert(key("Color"), v3(light.color));
         c.insert(key("Intensity"), f32_value(light.intensity));
         c.insert(key("Radius"), f32_value(light.radius));
-        // Radians in the file, degrees in the component — the C++ header's
-        // KHR_lights_punctual parity.
+        // Radians in the file, degrees in the component, for KHR_lights_punctual
+        // parity.
         c.insert(
             key("InnerConeAngle"),
             f32_value(light.inner_cone_angle.to_radians()),
@@ -382,7 +381,7 @@ fn entity_value(scene: &Scene, entity: Entity) -> Value {
         );
         c.insert(key("PlaybackSpeed"), f32_value(animator.speed));
         c.insert(key("IsPlaying"), Value::Bool(animator.playing));
-        // `RD3d::LoopMode`: None = 0, Loop = 1, PingPong = 2.
+        // LoopMode: None = 0, Loop = 1, PingPong = 2.
         c.insert(key("LoopMode"), int(if animator.looping { 1 } else { 0 }));
         c.insert(key("Time"), f32_value(animator.time));
         map.insert(key("AnimatorComponent"), Value::Mapping(c));
@@ -558,8 +557,8 @@ fn read_components(scene: &mut Scene, entity: Entity, node: &Value) {
     }
 
     if let Some(node) = node.get("TextComponent") {
-        // The C++ key is `FontAssetPath`; `FontAsset` is accepted too because the
-        // renderer contract named it that way.
+        // `FontAssetPath` is the canonical key; `FontAsset` is accepted too
+        // because the renderer contract named it that way.
         let font_path = node
             .get("FontAssetPath")
             .or_else(|| node.get("FontAsset"))
@@ -686,7 +685,7 @@ fn read_components(scene: &mut Scene, entity: Entity, node: &Value) {
             entity,
             Collider {
                 shape: ColliderShape::Sphere {
-                    // The C++ `SphereCollider3DComponent` default radius.
+                    // The `SphereCollider3DComponent` default radius.
                     radius: node.get("Radius").and_then(as_f32).unwrap_or(0.5),
                 },
                 offset: node
@@ -709,7 +708,7 @@ fn read_components(scene: &mut Scene, entity: Entity, node: &Value) {
             entity,
             Collider {
                 shape: ColliderShape::Capsule {
-                    // The C++ `CapsuleCollider3DComponent` defaults.
+                    // The `CapsuleCollider3DComponent` defaults.
                     radius: node.get("Radius").and_then(as_f32).unwrap_or(0.5),
                     half_height: node.get("HalfHeight").and_then(as_f32).unwrap_or(1.0),
                 },
@@ -773,7 +772,7 @@ fn read_components(scene: &mut Scene, entity: Entity, node: &Value) {
                     .get("PlaybackSpeed")
                     .and_then(as_f32)
                     .unwrap_or(default.speed),
-                // `RD3d::LoopMode`: None = 0, Loop = 1, PingPong = 2.
+                // LoopMode: None = 0, Loop = 1, PingPong = 2.
                 looping: match node.get("LoopMode").and_then(Value::as_i64) {
                     Some(mode) => mode == 1,
                     None => default.looping,
@@ -823,11 +822,10 @@ fn read_components(scene: &mut Scene, entity: Entity, node: &Value) {
         );
     }
 
-    // A component name this port does not know is skipped, not fatal: the C++
-    // tree writes several (`Model3DComponent`, `ModelNodeComponent`,
-    // `RigidBody2DComponent`, `BoxColliderComponent`) that are deliberately not
-    // ported, and an unknown name from a newer editor must not make a scene
-    // unloadable.
+    // An unknown component name is skipped, not fatal: scenes carry several
+    // (`Model3DComponent`, `ModelNodeComponent`, `RigidBody2DComponent`,
+    // `BoxColliderComponent`) this build does not implement, and an unknown name
+    // from a newer editor must not make a scene unloadable.
     if let Some(map) = node.as_mapping() {
         for name in map.keys() {
             if let Some(name) = name.as_str() {
@@ -870,9 +868,9 @@ fn key(name: &str) -> Value {
 fn f32_value(value: f32) -> Value {
     // `Number` stores an f64, so going through `From<f32>` would print
     // `0.05000000074505806` for `0.05f32`. Re-parsing the shortest decimal that
-    // reproduces the f32 keeps the file the size and shape the C++ emitter
-    // wrote; the fallback covers the spellings YAML does not share with Rust
-    // (`inf`, `NaN`).
+    // reproduces the f32 keeps the file the size and shape the format expects;
+    // the fallback covers the spellings YAML does not share with Rust (`inf`,
+    // `NaN`).
     match value.to_string().parse::<serde_yaml::Number>() {
         Ok(number) => Value::Number(number),
         Err(_) => Value::Number(value.into()),

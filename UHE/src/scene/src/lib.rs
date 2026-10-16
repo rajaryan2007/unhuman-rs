@@ -1,17 +1,16 @@
-//! `meats` — the scene crate.
+//! `meats` - the scene crate.
 //!
-//! Port of the C++ `UHE/Scene/`: an ECS on `hecs`, a single-parent hierarchy
-//! with a per-frame world-transform cache, the component set from
-//! `Components.h`, and the `.unhuman` YAML serializer.
+//! An ECS on `hecs`, a single-parent hierarchy with a per-frame world-transform
+//! cache, the component set, and the `.unhuman` YAML serializer.
 //!
-//! Two things are deliberately different from the C++:
+//! Two deliberate differences:
 //!
 //! * `Entity` is this crate's own generational handle rather than a bare
 //!   `hecs::Entity`, so a handle taken before a destroy is refused instead of
 //!   addressing whatever now occupies the slot.
-//! * `NativeScript` holds a `Box<dyn Script>`. The C++'s `InstantiateScript` /
-//!   `DestroyScript` function pointers and the raw `ScriptableEntity*` they
-//!   owned were the unsafe part of the tree; nothing here needs `unsafe`.
+//! * `NativeScript` holds a `Box<dyn Script>`. Function pointers plus a raw
+//!   `ScriptableEntity*` would own a lifetime nothing here needs, so this crate
+//!   needs no `unsafe`.
 
 pub mod camera;
 pub mod components;

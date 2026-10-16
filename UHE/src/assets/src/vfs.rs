@@ -4,18 +4,15 @@ use crate::error::{Error, Result};
 
 /// The file system an asset path is resolved against.
 ///
-/// The C++ `Vfs` mounted virtual prefixes to physical roots (`game:`,
-/// `engine:`) and `FileSystem` bridged the legacy unqualified paths into it.
-/// Both are one type here: an ordered list of roots, searched in order, first
-/// match wins. Layered overrides (a mod directory mounted ahead of the game
-/// directory) are a mount order, not a second mechanism.
+/// One type: an ordered list of roots, searched in order, first match wins.
+/// Layered overrides (a mod directory mounted ahead of the game directory) are
+/// a mount order, not a second mechanism.
 ///
 /// Virtual paths use `/` on every platform, and a `\` is treated as a separator
 /// too, so a path written on Windows still resolves on Linux. A path that would
 /// leave its root (`../`, or an absolute/drive-qualified path) is refused
-/// rather than resolved: `Vfs::ResolveAll` in the C++ compared the resolved
-/// path against the mount root with `std::mismatch` and *skipped* the mount on
-/// escape, which turns a traversal attempt into "not found" and hides it.
+/// rather than resolved: skipping an escaping mount would turn a traversal
+/// attempt into "not found" and hide it.
 pub struct Vfs {
     roots: Vec<PathBuf>,
 }

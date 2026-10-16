@@ -1,17 +1,14 @@
 //! The one file that names `meats` types and builds components.
 //!
-//! Kept apart from the rules so that the ECS shape — component names, field
-//! names, the insert call — is in one place instead of spread through the game
-//! logic. The C++ layer did this through `Entity::AddComponent<T>()` and
-//! `GetComponent<T>()`.
+//! Kept apart from the rules so that the ECS shape (component names, field names, the
+//! insert call) is in one place instead of spread through the game logic.
 
 use glam::{Mat4, Vec3};
 use meats::{
     AudioSource, Camera, Entity, Light, LightKind, MeshRenderer, Scene, SceneCamera, Transform,
 };
 
-/// Spawns an entity with a transform, the way `Scene::CreateEntity` gives every
-/// entity an `IDComponent`, a `TransformComponent` and a `TagComponent`.
+/// Spawns an entity with a translation and a scale.
 pub(crate) fn spawn(scene: &mut Scene, name: &str, translation: Vec3, scale: Vec3) -> Entity {
     let entity = scene.spawn(name);
     set_translation(scene, entity, translation);
@@ -35,8 +32,7 @@ fn set_scale(scene: &mut Scene, entity: Entity, scale: Vec3) {
     }
 }
 
-/// Mouse look: yaw and pitch, in degrees, onto the primary camera. The C++
-/// `EditorCamera` wrote the same two angles on its own transform.
+/// Mouse look: yaw and pitch, in degrees, onto the primary camera.
 pub(crate) fn aim(scene: &mut Scene, yaw_degrees: f32, pitch_degrees: f32) {
     let Some(camera) = scene.primary_camera() else {
         return;
@@ -48,7 +44,7 @@ pub(crate) fn aim(scene: &mut Scene, yaw_degrees: f32, pitch_degrees: f32) {
     }
 }
 
-/// The C++ `EditorCamera(45, 16/9, 0.1, 1000)`, whose fov is in radians.
+/// Builds a perspective camera, with `fov_degrees` converted to radians.
 pub(crate) fn add_primary_camera(
     scene: &mut Scene,
     entity: Entity,
@@ -64,7 +60,7 @@ pub(crate) fn add_primary_camera(
     let _ = scene.insert(entity, camera);
 }
 
-/// The C++ layer's `DirectionalLightComponent`, white at full intensity.
+/// Adds a white directional light at full intensity.
 pub(crate) fn add_directional_light(scene: &mut Scene, entity: Entity) {
     let light = Light {
         kind: LightKind::Directional,
@@ -73,7 +69,7 @@ pub(crate) fn add_directional_light(scene: &mut Scene, entity: Entity) {
     let _ = scene.insert(entity, light);
 }
 
-/// A mesh by virtual path, the C++ `Model3DComponent.ModelPath`.
+/// A mesh by virtual path.
 pub(crate) fn add_mesh(scene: &mut Scene, entity: Entity, path: &str) {
     let mesh = MeshRenderer {
         mesh_path: path.to_owned(),
@@ -82,8 +78,8 @@ pub(crate) fn add_mesh(scene: &mut Scene, entity: Entity, path: &str) {
     let _ = scene.insert(entity, mesh);
 }
 
-/// A sound on an entity by virtual path, the C++ `PlaySound3D`'s first argument.
-/// The handle beside it is `Scene::resolve_assets`' to fill.
+/// A sound on an entity by virtual path. The handle beside it is
+/// `Scene::resolve_assets`' to fill.
 pub(crate) fn add_audio_source(scene: &mut Scene, entity: Entity, path: &str) {
     let source = AudioSource {
         clip_path: path.to_owned(),
@@ -107,8 +103,7 @@ pub(crate) fn translation(scene: &Scene, entity: Entity) -> Vec3 {
 
 /// Where the primary camera is and which way it looks.
 ///
-/// The camera looks down its own -Z, the convention `meats` inherits from `glm`
-/// and from `EditorCamera::GetForwardDirection`.
+/// The camera looks down its own -Z, the convention `meats` uses.
 pub(crate) fn camera_pose(scene: &Scene) -> Option<(Vec3, Vec3)> {
     let camera = scene.primary_camera()?;
     let transform: Mat4 = scene.world_transform(camera);

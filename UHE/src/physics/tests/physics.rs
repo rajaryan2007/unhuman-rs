@@ -1,9 +1,5 @@
-//! The port's own gate: what physics must do to a scene, with no GPU, no window and no
-//! audio — a `Scene` and a `Physics3D`, stepped by hand.
-//!
-//! The C++ had no equivalent: `tests/scene` recompiled engine `.cpp` files with a
-//! stubbed renderer, and physics only ran inside play mode (`Scene::OnRuntimeStart`), so
-//! none of this was testable.
+//! What physics must do to a scene, with no GPU, no window and no audio: a `Scene` and a
+//! `Physics3D`, stepped by hand.
 
 use adam::PhysicsBackend;
 use femur::{ColliderShape, Physics3D, GRAVITY};
@@ -18,7 +14,7 @@ fn box_shape(half_extent: Vec3) -> ColliderShape {
 }
 
 /// Damping is zeroed on every test body so the numbers below are the integrator's and not
-/// the component default's (0.05, `Components.h:241`).
+/// the component default's.
 fn add_body(
     scene: &mut Scene,
     name: &str,
@@ -267,8 +263,7 @@ fn a_rigid_body_without_a_collider_creates_no_body() {
         physics.step(&mut scene, DT);
     }
 
-    // The C++ created a body only inside `if (shape)` (`Scene.cpp:1412`), so a rigid body
-    // with no collider component fell nowhere.
+    // A rigid body with no collider component falls nowhere.
     assert_eq!(physics.body_count(), 0);
     assert_eq!(before, snapshot(&scene));
 }
@@ -290,10 +285,10 @@ fn an_unchanged_body_keeps_its_handle() {
 
 /// The rotation the scene authored has to survive the trip into Rapier and back.
 ///
-/// `Transform::rotation_quat` is the C++ `glm::quat(vec3)` — `Rz*Ry*Rx`, glam's `XYZEx`
-/// and not the `Rx*Ry*Rz` of its `XYZ` — so `to_euler(EulerRot::XYZ)`, the inverse anyone
-/// would reach for, belongs to a different order and would hand the scene angles that
-/// mean another orientation.
+/// `Transform::rotation_quat` is the `Rz*Ry*Rx` order, glam's `XYZEx` and not the
+/// `Rx*Ry*Rz` of its `XYZ`, so `to_euler(EulerRot::XYZ)`, the inverse anyone would reach
+/// for, belongs to a different order and would hand the scene angles that mean another
+/// orientation.
 #[test]
 fn an_authored_rotation_survives_the_round_trip() {
     let mut scene = Scene::new();

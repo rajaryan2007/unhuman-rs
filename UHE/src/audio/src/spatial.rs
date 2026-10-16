@@ -1,10 +1,9 @@
 //! Distance falloff and stereo placement.
 //!
-//! The C++ backend configured neither: it called `ma_sound_set_position` and let
-//! miniaudio's defaults run — `ma_attenuation_model_inverse` with
-//! `maxDistance = FLT_MAX`, a falloff that only reaches silence at infinity. A
-//! source therefore has a range of its own here, and the port falls off linearly to
-//! zero at it. The panning maths is miniaudio's, floor included.
+//! miniaudio's defaults would run inverse attenuation with `maxDistance = FLT_MAX`,
+//! a falloff that only reaches silence at infinity, so a source has a range of its
+//! own here and falls off linearly to zero at it. The panning maths is miniaudio's,
+//! floor included.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -34,7 +33,7 @@ pub fn attenuation(distance: f32, range: f32) -> f32 {
 }
 
 /// Where a source sits relative to the listener: -1.0 hard left, 0.0 directly in
-/// front of it, +1.0 hard right. The listener's right vector is `forward × up`,
+/// front of it, +1.0 hard right. The listener's right vector is `forward x up`,
 /// which is miniaudio's right-handed convention (forward is -Z).
 pub fn pan(listener: &Listener, position: Vec3) -> f32 {
     let offset = position - listener.position;
@@ -105,7 +104,7 @@ impl Default for PanHandle {
 }
 
 /// A stereo source whose per-channel gains change while it plays: this is what
-/// makes a spatial voice follow the listener. Its input must be stereo — wrap a
+/// makes a spatial voice follow the listener. Its input must be stereo: wrap a
 /// mono one in [`rodio::source::UniformSourceIterator`] first.
 #[derive(Clone, Debug)]
 pub struct Pan<S> {

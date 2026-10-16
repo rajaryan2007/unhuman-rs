@@ -27,8 +27,8 @@ fn perspective_projection_at_a_known_aspect() {
     camera.set_viewport_size(16.0, 9.0);
     assert_eq!(camera.projection_type(), ProjectionType::Perspective);
 
-    // f = 1 / tan(fov / 2) = 1 at fov = pi/2, so the matrix is the glm
-    // `glm::perspective` one: 1/aspect across, 1 up, and the near/far terms.
+    // f = 1 / tan(fov / 2) = 1 at fov = pi/2, so the standard OpenGL
+    // perspective matrix: 1/aspect across, 1 up, and the near/far terms.
     let aspect = 16.0 / 9.0;
     let near = 0.1;
     let far = 100.0;
@@ -48,7 +48,7 @@ fn orthographic_projection_at_a_known_aspect() {
     assert_eq!(camera.projection_type(), ProjectionType::Orthographic);
 
     // half_height = size / 2 = 5, half_width = half_height * aspect = 10, so the
-    // projection spans [-10, 10] x [-5, 5] with the C++ near/far of -1 and 1.
+    // projection spans [-10, 10] x [-5, 5] with near/far of -1 and 1.
     let expected = Mat4::from_cols(
         Vec4::new(1.0 / 10.0, 0.0, 0.0, 0.0),
         Vec4::new(0.0, 1.0 / 5.0, 0.0, 0.0),
@@ -60,8 +60,8 @@ fn orthographic_projection_at_a_known_aspect() {
 
 #[test]
 fn a_camera_with_no_viewport_is_square_not_nan() {
-    // The C++ divides width by height unguarded, so a zero-height viewport makes
-    // the projection non-finite. This one clamps instead.
+    // A zero-height viewport would make the projection non-finite; this one
+    // clamps instead.
     let camera = SceneCamera::new_perspective(std::f32::consts::FRAC_PI_4, 0.1, 10.0);
     assert_eq!(camera.aspect_ratio(), 0.0);
     assert!(camera.projection().is_finite());
@@ -138,9 +138,9 @@ fn euler_degrees_round_trips_a_compound_rotation() {
 
 #[test]
 fn euler_degrees_and_rotation_quat_are_inverses() {
-    // `euler_degrees` is the C++ `glm::eulerAngles`, not glam's `to_euler`, so
-    // the pair can only be checked against itself. Rotations are compared, not
-    // quaternions: `q` and `-q` are the same rotation and both are reachable.
+    // `euler_degrees` is not glam's `to_euler`, so the pair can only be checked
+    // against itself. Rotations are compared, not quaternions: `q` and `-q` are
+    // the same rotation and both are reachable.
     let rotations = [
         Vec3::new(30.0, 20.0, 10.0),
         Vec3::new(-45.0, 60.0, -15.0),
@@ -170,7 +170,7 @@ fn light_defaults_match_the_cpp_headers() {
     assert_eq!(light.color, Vec3::ONE);
     assert_eq!(light.intensity, 1.0);
     assert_eq!(light.radius, 10.0);
-    // 0.2617994 rad / 0.5235988 rad in `Components.h`, in degrees here.
+    // 0.2617994 rad / 0.5235988 rad, expressed in degrees here.
     assert!((light.inner_cone_angle - 15.0).abs() < 1e-4);
     assert!((light.outer_cone_angle - 30.0).abs() < 1e-4);
     assert!(light.enabled);
@@ -205,7 +205,7 @@ fn camera_defaults_match_the_cpp_header() {
     let camera = Camera::default();
     assert!(camera.primary);
     assert!(!camera.fixed_aspect_ratio);
-    // `SceneCamera`'s C++ default projection is orthographic.
+    // `SceneCamera`'s default projection is orthographic.
     assert_eq!(
         camera.camera.projection_type(),
         ProjectionType::Orthographic

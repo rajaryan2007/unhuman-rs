@@ -25,7 +25,7 @@ pub struct VoiceSpec {
 }
 
 impl VoiceSpec {
-    /// What a scene source asks for, at the entity's world position — the component
+    /// What a scene source asks for, at the entity's world position: the component
     /// carries no position of its own.
     pub fn from_source(source: &AudioSource, position: Vec3) -> Self {
         Self {
@@ -74,9 +74,7 @@ pub struct Voice {
 ///
 /// Bounded on purpose: a spawn into a full pool drops the voice that has been
 /// playing longest, so a scene that starts a sound every frame cannot grow the
-/// table without limit. The C++ `s_activeSounds` was an unbounded vector that only
-/// shrank when a sound ended, and a `CreateEntity`/`DestroyEntity` loop that started
-/// sounds leaked one `ma_sound` per iteration.
+/// table without limit.
 #[derive(Debug)]
 pub struct VoicePool {
     capacity: usize,

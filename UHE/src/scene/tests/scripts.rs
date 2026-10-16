@@ -27,7 +27,7 @@ impl Recorder {
 }
 
 /// Logs each hook, and reaches back into the scene through the `&mut Scene` it
-/// is handed — which is the whole point of the shape.
+/// is handed, which is the whole point of the shape.
 struct TestScript {
     recorder: Recorder,
     ticks: u32,
@@ -168,7 +168,7 @@ fn on_destroy_fires_when_the_scene_is_dropped() {
         );
     }
 
-    // `on_create` never ran — the scene was dropped before an update.
+    // `on_create` never ran; the scene was dropped before an update.
     assert_eq!(recorder.entries(), vec!["destroy".to_string()]);
 }
 

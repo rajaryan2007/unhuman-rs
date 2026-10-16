@@ -1,8 +1,8 @@
 //! Skin and animation parsing.
 //!
-//! Port of `UHE/src/UHE/Renderer3D/LoadModelAnimation.cpp`. Separate from the
-//! scene walk because it answers a different question: the walk places
-//! geometry, this builds the deformation data a runtime applies on top.
+//! Separate from the scene walk because it answers a different question: the
+//! walk places geometry, this builds the deformation data a runtime applies on
+//! top.
 
 use glam::Mat4;
 use gltf::animation::util::{ReadOutputs, Rotations, Translations};
@@ -17,11 +17,10 @@ use crate::mesh::{
 
 /// Every skin in the file, plus the one joint hierarchy that spans all nodes.
 ///
-/// Port of `Model::ParseSkins` (`LoadModelAnimation.cpp:37`). The C++ built the
-/// hierarchy from *every* node, not only the ones a skin lists, because a bone
-/// chain's parents are ordinary nodes too; the first skin's joints and inverse
-/// bind matrices are also copied onto the skeleton, which is the legacy pair of
-/// fields the C++ accessors exposed.
+/// The hierarchy is built from *every* node, not only the ones a skin lists,
+/// because a bone chain's parents are ordinary nodes too; the first skin's
+/// joints and inverse bind matrices are also copied onto the skeleton, so both
+/// remain reachable without a skin lookup.
 pub(crate) fn parse_skins(
     document: &gltf::Document,
     buffers: &[BufferData],
@@ -77,7 +76,7 @@ pub(crate) fn parse_skins(
             out.joints.push(joint.index() as i32);
         }
         // A skin without inverse bind matrices poses as if every joint were at
-        // the origin of the mesh; identity is what the C++ defaulted to.
+        // the origin of the mesh; identity is the default.
         out.inverse_bind = vec![Mat4::IDENTITY.to_cols_array_2d(); out.joints.len()];
 
         if let Some(matrices) = skin
@@ -113,9 +112,8 @@ pub(crate) fn parse_skins(
 
 /// Every animation clip in the file.
 ///
-/// Port of `Model::ParseAnimations` (`LoadModelAnimation.cpp:141`), including
-/// its gap: morph-target weight channels are skipped, because nothing in this
-/// engine blends them.
+/// Morph-target weight channels are skipped, because nothing in this engine
+/// blends them.
 pub(crate) fn parse_animations(
     document: &gltf::Document,
     buffers: &[BufferData],
@@ -193,9 +191,8 @@ pub(crate) fn parse_animations(
 
 /// The track already targeting this node, or a new one.
 ///
-/// Port of `FindOrAddTrack` (`LoadModelAnimation.cpp:118`): glTF may emit
-/// several channels for one (node, path) pair, and merging them is what keeps
-/// the sampled pose well-defined.
+/// glTF may emit several channels for one (node, path) pair, and merging them
+/// is what keeps the sampled pose well-defined.
 fn find_or_add_vector(tracks: &mut Vec<VectorTrack>, target: u32) -> &mut VectorTrack {
     let index = match tracks.iter().position(|track| track.target == target) {
         Some(index) => index,
@@ -228,8 +225,6 @@ fn find_or_add_quaternion(tracks: &mut Vec<QuaternionTrack>, target: u32) -> &mu
 
 /// `CUBICSPLINE` output is `[inTangent_k, value_k, outTangent_k]` per key, so
 /// one accessor element in three belongs in each array.
-///
-/// Port of `AppendTrackKeys` (`LoadModelAnimation.cpp:130`).
 fn fill_vector(
     track: &mut VectorTrack,
     times: &[f32],

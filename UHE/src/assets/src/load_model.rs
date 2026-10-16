@@ -1,21 +1,20 @@
 //! glTF/GLB model loading entry point and scene-graph walk.
 //!
-//! Port of `UHE/src/UHE/Renderer3D/LoadModel.cpp`. This file owns everything
-//! that needs the whole asset — materials, the scene walk, resource lifetime —
-//! while primitive extraction and animation parsing live in their own modules,
-//! which is the same split the C++ used across `LoadModel.cpp`,
-//! `LoadModelGeometry.cpp` and `LoadModelAnimation.cpp`.
+//! This file owns everything that needs the whole asset (materials, the scene
+//! walk, resource lifetime) while primitive extraction and animation parsing
+//! live in their own modules, matching the split of the three loaders.
 //!
-//! **Not ported from those files:** `EXT_meshopt_compression`. The C++ decoded
-//! compressed buffer views through meshoptimizer (`MeshoptDecode.cpp`), a C
-//! library. Reading those views without decoding yields garbage geometry, so a
-//! file that declares the extension is refused with that reason instead. The
-//! KHR extension blocks (`KHR_materials_clearcoat`, `…specular`, `…transmission`,
-//! `KHR_texture_transform`, `KHR_lights_punctual`, `KHR_texture_basisu`) are not
-//! read either: `gltf`'s accessors for them are feature-gated and the workspace
-//! manifest enables only `utils`/`names`/`extensions`. They are reported by name
-//! in [`ModelData::unsupported_extensions`], which is what the C++ did with an
-//! extension it had not implemented.
+//! **Not done:** `EXT_meshopt_compression`. Compressed buffer views were
+//! decoded through meshoptimizer, a C library. Reading those views without
+//! decoding yields garbage geometry, so a file that declares the extension is
+//! refused with that reason instead. The KHR extension blocks
+//! (`KHR_materials_clearcoat`, `KHR_materials_specular`,
+//! `KHR_materials_transmission`, `KHR_texture_transform`, `KHR_lights_punctual`,
+//! `KHR_texture_basisu`) are not read either: `gltf`'s accessors for them are
+//! feature-gated and the workspace manifest enables only `utils`/`names`/
+//! `extensions`. They are reported by name in
+//! [`ModelData::unsupported_extensions`] so a file that uses one is not
+//! silently mis-shaded.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -35,11 +34,11 @@ use crate::mesh::{
 
 /// Extensions whose values reach this crate's output.
 ///
-/// The C++ list (`IsExtensionSupported`, `LoadModel.cpp:32`) held an extension
-/// only if its values were actually shaded with, because a parsed-but-ignored
-/// extension renders subtly wrong with no error anywhere. This build reads no
-/// extension at all — the `gltf` features that would parse them are off — so
-/// the list is empty and every declared name is reported instead.
+/// An extension belongs here only if its values are actually shaded with,
+/// because a parsed-but-ignored extension renders subtly wrong with no error
+/// anywhere. This build reads no extension at all (the `gltf` features that
+/// would parse them are off), so the list is empty and every declared name is
+/// reported instead.
 const SUPPORTED_EXTENSIONS: &[&str] = &[];
 
 pub(crate) struct LoadedModel {
@@ -60,8 +59,6 @@ pub(crate) fn view_bytes<'a, 'b>(
 }
 
 /// The local transform of one node, `T * R * S` or the file's own matrix.
-///
-/// Port of `Model::NodeLocalTransform` (`LoadModel.cpp:112`).
 pub(crate) fn node_transform(node: &gltf::Node<'_>) -> Mat4 {
     let matrix = node.transform().matrix();
     Mat4::from_cols_array_2d(&matrix)
@@ -75,8 +72,8 @@ pub(crate) fn node_transform(node: &gltf::Node<'_>) -> Mat4 {
 pub(crate) fn load(path: &Path, bytes: &[u8]) -> Result<LoadedModel> {
     let parsed = match gltf::Gltf::from_slice(bytes) {
         Ok(parsed) => parsed,
-        // The C++ parsed with `DontRequireValidAssetMember`; a file that fails
-        // the crate's validation is retried unvalidated rather than refused.
+        // A file that fails the crate's validation is retried unvalidated
+        // rather than refused.
         Err(gltf::Error::Validation(_)) => gltf::Gltf::from_slice_without_validation(bytes)
             .map_err(|error| Error::Decode(format!("glTF: {error}")))?,
         Err(error) => return Err(Error::Decode(format!("glTF: {error}"))),
@@ -127,7 +124,7 @@ pub(crate) fn load(path: &Path, bytes: &[u8]) -> Result<LoadedModel> {
     };
 
     let mut roots = Vec::new();
-    // The C++ fell back to scene 0 when the file named no default scene.
+    // Fall back to scene 0 when the file names no default scene.
     let scene = document
         .default_scene()
         .or_else(|| document.scenes().next());
@@ -176,11 +173,9 @@ impl<'a, 'b> Walk<'a, 'b> {
     /// Appends one node and its subtree, returning its index in
     /// `model_nodes`, or `u32::MAX` for a node index that does not exist.
     ///
-    /// Port of `Model::ProcessNode` (`LoadModel.cpp:756`). The C++ set the
-    /// parent and child links *after* recursing because a reference into
-    /// `m_Nodes` would dangle the moment a child was appended; the same trap
-    /// exists here, and the answer is the same: keep the index, not the
-    /// reference.
+    /// Parent and child links are set *after* recursing because a reference
+    /// into `model_nodes` would dangle the moment a child was appended; keep
+    /// the index, not the reference.
     fn walk(&mut self, node_index: usize, parent_transform: Mat4) -> u32 {
         let Some(node) = self.nodes.get(node_index).cloned() else {
             return u32::MAX;
@@ -261,18 +256,17 @@ type TextureCache = HashMap<(usize, bool, SamplerData), Option<Arc<TextureData>>
 
 /// Every material in the file, with its textures decoded.
 ///
-/// Port of `Model::LoadMaterials` (`LoadModel.cpp:330`). Colour space is a
-/// property of the *slot*: `baseColor` and `emissive` are sRGB, `metallicRoughness`,
-/// `normal` and `occlusion` are linear data, and using one format for all of
-/// them gamma-decodes the linear maps on every sample.
+/// Colour space is a property of the *slot*: `baseColor` and `emissive` are
+/// sRGB, `metallicRoughness`, `normal` and `occlusion` are linear data, and
+/// using one format for all of them gamma-decodes the linear maps on every
+/// sample.
 fn load_materials(
     document: &gltf::Document,
     base: &Path,
     buffers: &[BufferData],
 ) -> Vec<MaterialData> {
     // One glTF image is routinely bound by several materials and slots; without
-    // this the identical pixels are decoded and resident once per reference
-    // (`LoadModel.cpp:363`).
+    // this the identical pixels are decoded and resident once per reference.
     let mut cache = TextureCache::new();
     let mut materials = Vec::new();
 
@@ -380,9 +374,8 @@ fn decode_texture(bytes: &[u8], srgb: bool) -> Option<(Image, Vec<MipLevel>)> {
 
 /// The encoded bytes of one `glTF` image, however the file stores it.
 ///
-/// Port of the `std::visit` in `LoadModel.cpp:399`: an external URI, a
-/// `data:` URI, or a slice of a buffer view (which in a GLB is the common case
-/// for embedded textures).
+/// An external URI, a `data:` URI, or a slice of a buffer view (which in a GLB
+/// is the common case for embedded textures).
 fn image_bytes(
     source: gltf::image::Source<'_>,
     base: &Path,
@@ -407,10 +400,10 @@ fn image_bytes(
 
 /// The sampler a texture declares, with the spec defaults for what it omits.
 ///
-/// Port of `SamplerDescForTexture` (`LoadModel.cpp:213`). Every mip-map variant
-/// of a filter folds into the filter itself, because mip selection is the
-/// sampler's other axis; wrap S and wrap T stay independent, since applying one
-/// mode to both axes is wrong for any atlas that clamps U and repeats V.
+/// Every mip-map variant of a filter folds into the filter itself, because mip
+/// selection is the sampler's other axis; wrap S and wrap T stay independent,
+/// since applying one mode to both axes is wrong for any atlas that clamps U
+/// and repeats V.
 fn sampler_data(sampler: gltf::texture::Sampler<'_>) -> SamplerData {
     let default = SamplerData::default();
     SamplerData {

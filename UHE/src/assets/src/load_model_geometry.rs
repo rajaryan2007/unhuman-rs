@@ -1,19 +1,17 @@
 //! CPU-side geometry extraction from a glTF mesh primitive.
 //!
-//! Port of `UHE/src/UHE/Renderer3D/LoadModelGeometry.cpp`. Touches no device:
-//! the C++ left its buffer handles null here too, so this half stayed
+//! Touches no device: the buffer handles stay null here, so this half stays
 //! compilable into a headless harness.
 //!
-//! **Not ported from that file:** the meshoptimizer passes. Vertex-cache and
-//! vertex-fetch reordering are pure permutations kept for device performance,
-//! vertex merging deduplicates byte-identical vertices, and tangent generation
-//! synthesises a frame where the file carries none. meshoptimizer is a C
-//! library, the crate's manifest carries no Rust equivalent, and adding one is
-//! not this port's call. Geometry is therefore correct and *un*-optimised:
-//! `TANGENT` is read when the file provides it and left empty when it does not,
-//! so a normal-mapped primitive needs a frame from the file until a generator
-//! is wired in. See `MeshoptDecode.cpp`'s note in [`crate::load_model`] for the
-//! compressed-view half of the same cut.
+//! **Not done:** the meshoptimizer passes. Vertex-cache and vertex-fetch
+//! reordering are pure permutations kept for device performance, vertex merging
+//! deduplicates byte-identical vertices, and tangent generation synthesises a
+//! frame where the file carries none. meshoptimizer is a C library with no Rust
+//! equivalent in the manifest, and adding one is out of scope. Geometry is
+//! therefore correct and *un*-optimised: `TANGENT` is read when the file
+//! provides it and left empty when it does not, so a normal-mapped primitive
+//! needs a frame from the file until a generator is wired in. See the note in
+//! [`crate::load_model`] for the compressed-view half of the same cut.
 
 use gltf::buffer::Data as BufferData;
 
@@ -22,9 +20,8 @@ use crate::mesh::{MaterialData, MeshData};
 
 /// Extracts one primitive, or `None` when it cannot be drawn.
 ///
-/// The C++ dropped a primitive with no `POSITION` and one whose indices came
-/// out empty; both are kept, because an entry the renderer cannot draw is worse
-/// than no entry at all.
+/// A primitive with no `POSITION` and one whose indices come out empty are both
+/// dropped: an entry the renderer cannot draw is worse than no entry at all.
 pub(crate) fn extract_primitive(
     primitive: &gltf::Primitive<'_>,
     buffers: &[BufferData],
@@ -65,7 +62,7 @@ pub(crate) fn extract_primitive(
         let uvs: Vec<[f32; 2]> = uvs.collect();
         if uvs.len() == vertex_count {
             // The V flip is the engine's UV convention and this is the only
-            // place that owns it (`LoadModelGeometry.cpp:186` says the same).
+            // place that owns it.
             mesh.uvs = uvs.into_iter().map(|uv| [uv[0], 1.0 - uv[1]]).collect();
         } else {
             log::warn!(
@@ -121,7 +118,7 @@ pub(crate) fn extract_primitive(
     mesh.indices = match reader.read_indices() {
         Some(indices) => indices.into_u32().collect(),
         // Non-indexed geometry is legal glTF. Without synthesised indices the
-        // draw is silently skipped, which the C++ hit too.
+        // draw is silently skipped.
         None => (0..vertex_count as u32).collect(),
     };
 
@@ -162,11 +159,10 @@ pub(crate) fn extract_primitive(
 /// Area-weighted vertex normals from the triangle geometry, for a primitive
 /// that carries no `NORMAL`.
 ///
-/// Port of the synthesis at `LoadModelGeometry.cpp:262`: without it an
-/// un-normalled model defaults to `(0, 1, 0)` on every vertex and shades black
-/// on its side and bottom faces. The cross product is *not* normalised per
-/// triangle on purpose — its length is twice the triangle's area, which is what
-/// makes the sum area-weighted.
+/// Without it an un-normalled model defaults to `(0, 1, 0)` on every vertex and
+/// shades black on its side and bottom faces. The cross product is *not*
+/// normalised per triangle on purpose: its length is twice the triangle's area,
+/// which is what makes the sum area-weighted.
 fn synthesize_normals(mesh: &mut MeshData) {
     mesh.normals.fill([0.0, 0.0, 0.0]);
 
@@ -205,7 +201,7 @@ fn synthesize_normals(mesh: &mut MeshData) {
             [normal[0] / length, normal[1] / length, normal[2] / length]
         } else {
             // A degenerate triangle (or a vertex no triangle uses) has no
-            // direction to take; up is the same fallback the C++ used.
+            // direction to take; up is the fallback.
             [0.0, 1.0, 0.0]
         };
     }

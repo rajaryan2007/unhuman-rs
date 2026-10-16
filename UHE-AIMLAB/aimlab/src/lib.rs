@@ -1,20 +1,16 @@
-//! The UHEGAME demo, as a plugin.
+//! The aim lab demo, as a plugin.
 //!
-//! Ported from `UHEGAME/src/{GameApp.cpp,AimLabLayer.cpp,AimLabLayer.h}`. The
-//! C++ pushed an `AimLabLayer` onto the application and read input from the
-//! static `UHE::Input`; here the plugin owns the same state and reads the engine
-//! — the cursor and the buttons come from `Engine::input`, which the window
-//! layer fills in, and the entities live in `Engine::scene`.
+//! The plugin owns the demo's state and reads the engine: the cursor and the buttons
+//! come from `Engine::input`, which the window layer fills in, and the entities live
+//! in `Engine::scene`.
 //!
-//! Kept from the C++ layer: the five targets, the spawn box, the hit rule and the
-//! look sensitivity. Added by the port, and named as such: a lifetime (the C++
-//! targets lived until they were hit), a spawn cadence, and a point total.
+//! Five targets, a spawn box, a hit rule and the look sensitivity, plus a target
+//! lifetime, a spawn cadence and a point total.
 //!
 //! The demo's assets are the repository's: `assets/models/Sphere.glb` for the
 //! targets, `assets/models/Box.gltf` for the ground and `assets/audio/gunshot.wav`
-//! for the shot. `UHEGAME/assets/models/pistol_animations_blender.glb` (12 MB) is
-//! deliberately not copied, because no code path here names it — the gun model,
-//! its skeleton and the fire/reload clips stay unported.
+//! for the shot. The 12 MB `pistol_animations_blender.glb` is deliberately not
+//! copied, because no code path here names it.
 
 mod rules;
 mod scene;
@@ -30,13 +26,11 @@ pub use rules::{
     TARGET_LIFETIME, TARGET_RADIUS,
 };
 
-/// The C++ layer's `Sphere.glb` targets and `Box.gltf` ground, as virtual paths
-/// against the workspace asset root — the C++ joined the same two names onto its
-/// game asset directory, and `assets/` is this tree's.
+/// The target and ground meshes, as virtual paths against the workspace asset root.
 const TARGET_MESH: &str = "assets/models/Sphere.glb";
 const GROUND_MESH: &str = "assets/models/Box.gltf";
 
-/// The C++ layer's `audio/gunshot.wav`, played on every shot.
+/// The sound played on every shot.
 const SHOT_SOUND: &str = "assets/audio/gunshot.wav";
 
 /// The `physics_test.unhuman` floor: scale 20x1x20, top face at y = -1.5, which
@@ -44,8 +38,8 @@ const SHOT_SOUND: &str = "assets/audio/gunshot.wav";
 const GROUND_TRANSLATION: Vec3 = Vec3::new(0.0, -2.0, SPAWN_Z);
 const GROUND_SCALE: Vec3 = Vec3::new(20.0, 1.0, 20.0);
 
-/// The C++ layer's 0.0024 radians per pixel, and the 200-pixel jump it ignored
-/// because a re-captured cursor warps.
+/// 0.0024 radians per pixel, and the 200-pixel jump ignored because a re-captured
+/// cursor warps.
 const MOUSE_SENSITIVITY: f32 = 0.0024;
 const MAX_MOUSE_DELTA: f32 = 200.0;
 const PITCH_LIMIT: f32 = std::f32::consts::FRAC_PI_2 * 0.995;
@@ -105,8 +99,7 @@ impl AimLabPlugin {
         self.targets.push(Target { entity, life });
     }
 
-    /// The nearest target the crosshair is over. The C++ read an entity-ID pixel
-    /// at the screen centre; with no GPU in the way this is that ray.
+    /// The nearest target the crosshair is over, picked by a camera ray.
     fn pick(&self, scene: &Scene) -> Option<Entity> {
         let (origin, direction) = scene::camera_pose(scene)?;
         let mut nearest: Option<(f32, Entity)> = None;
@@ -136,7 +129,7 @@ impl AimLabPlugin {
         }
     }
 
-    /// Mouse look, the C++ layer's yaw and pitch in radians.
+    /// Mouse look: yaw and pitch in radians.
     fn look(&mut self, eng: &mut Engine) {
         let (dx, dy) = eng.input.cursor_delta();
         if dx == 0.0 && dy == 0.0 {
@@ -154,9 +147,8 @@ impl AimLabPlugin {
         );
     }
 
-    /// One shot per press, the C++ layer's `mouseDown && !m_MouseWasPressed`.
-    /// Held rather than pressed, because a frame can run several substeps and
-    /// "pressed" stays true for all of them.
+    /// One shot per press. The button is held rather than pressed, because a frame can
+    /// run several substeps and "pressed" stays true for all of them.
     fn shoot(&mut self, eng: &mut Engine) {
         let down = eng.input.is_mouse_held(MouseButton::Left);
         let fired = down && !self.mouse_was_down;
@@ -179,10 +171,9 @@ impl AimLabPlugin {
         }
     }
 
-    /// The C++ layer's `PlaySound3D(gunshot.wav, gun)`. A one-shot, so it goes
-    /// through the backend's `play` rather than a `playing` flag that `wire`
-    /// would keep restarting; the clip and its gain come from the camera's sound
-    /// component, which `resolve_assets` filled from the path.
+    /// Play the shot as a one-shot, through the backend's `play` rather than a
+    /// `playing` flag that `wire` would keep restarting; the clip and its gain come
+    /// from the camera's sound component, which `resolve_assets` filled from the path.
     fn play_shot(&self, eng: &mut Engine) {
         let Some(camera) = eng.scene.primary_camera() else {
             return;
@@ -217,8 +208,7 @@ impl Plugin for AimLabPlugin {
         let camera = scene::spawn(&mut eng.scene, "Camera", CAMERA_POSITION, Vec3::ONE);
         scene::add_primary_camera(&mut eng.scene, camera, CAMERA_FOV, CAMERA_NEAR, CAMERA_FAR);
 
-        // The C++ played the shot at the gun, which sits at the camera. There is
-        // no gun entity here, so the clip hangs on the camera: the ear and the
+        // There is no gun entity, so the clip hangs on the camera: the ear and the
         // muzzle are the same point for a one-shot the listener takes.
         scene::add_audio_source(&mut eng.scene, camera, SHOT_SOUND);
 

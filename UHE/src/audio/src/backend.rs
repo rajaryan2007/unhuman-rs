@@ -1,8 +1,7 @@
-//! rodio output: the counterpart of `MiniAudioBackend`.
+//! rodio output: everything that touches the sound card.
 //!
-//! Everything that touches the sound card lives here — the open sink, and one
-//! `Player` per voice — so [`crate::AudioEngine`] above it is plain bookkeeping that
-//! runs with no device, no thread and no driver at all.
+//! The open sink and one `Player` per voice live here, so [`crate::AudioEngine`]
+//! above it is plain bookkeeping that runs with no device, no thread and no driver.
 
 use std::collections::HashMap;
 
@@ -17,8 +16,8 @@ use crate::voice::Voice;
 
 /// An open output device and the voices playing through it.
 ///
-/// Dropping this is the C++ `Shutdown`: `players` is declared first so it drops
-/// first, and the sounds stop while the stream that plays them is still open.
+/// `players` is declared first so it drops first, and the sounds stop while the
+/// stream that plays them is still open.
 pub struct Backend {
     players: HashMap<VoiceId, Player>,
     sink: MixerDeviceSink,
@@ -28,8 +27,7 @@ impl Backend {
     /// Open the default output device, or `None` when this machine has none.
     ///
     /// A machine with no sound card is a configuration, not an error: the caller
-    /// runs silent, which is what the C++ did too — its `Init` logged an error and
-    /// returned with `s_Initialized` false, and every later call became a no-op.
+    /// runs silent, and every later call becomes a no-op.
     pub fn open() -> Option<Self> {
         match DeviceSinkBuilder::open_default_sink() {
             Ok(mut sink) => {
@@ -54,8 +52,7 @@ impl Backend {
     }
 
     /// Decode a clip and start it on this device. `false` when the clip cannot be
-    /// decoded — the C++ `MA_SUCCESS` check, which logged the path and freed the
-    /// sound it had allocated.
+    /// decoded, after logging the path.
     pub fn start(&mut self, voice: &Voice, sound: &Sound) -> bool {
         if voice.spec.looping {
             // Told to loop by the decoder, which seeks back to the start. Looping the
@@ -99,8 +96,7 @@ impl Backend {
         self.players.remove(&id).is_some()
     }
 
-    /// The voices whose sound has played to the end — the C++ sweep over
-    /// `s_activeSounds`, which freed every `ma_sound` that had stopped playing.
+    /// The voices whose sound has played to the end.
     pub fn finished(&self) -> Vec<VoiceId> {
         self.players
             .iter()

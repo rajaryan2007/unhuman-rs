@@ -1,10 +1,8 @@
 //! Window and input. `winit` 0.30, re-exported, and nothing else.
 //!
-//! The C++ had a `Window` interface with one implementation per platform
-//! (`Platform/Windows/WindowsWindow.cpp`), an `Input` that polled GLFW
-//! (`WindowInput.cpp`), and — on Windows — a file dialog. Nothing in a window is
-//! platform code once `winit` exists, so this crate is the whole of what the
-//! C++ tree needed two platform directories for.
+//! Nothing in a window is platform code once `winit` exists, so this crate
+//! replaces what a per-platform `Window` interface, a direct input poll and a
+//! Windows file dialog would otherwise need.
 //!
 //! Two things are deliberately absent. There is no global: the loop is a value,
 //! the window is `Arc`-shared with whatever draws into it, and the input state
@@ -23,7 +21,7 @@ pub use window::{run_windowed, FrameView, WindowDesc, WindowError, WindowExt};
 
 /// The window itself, shared. The wgpu backend is handed `Arc<Window>` and calls
 /// `Instance::create_surface(window.clone())`, so no backend crate has to name a
-/// windowing library — `raw-window-handle` 0.6 comes in with `winit`, and is what
+/// windowing library: `raw-window-handle` 0.6 comes in with `winit`, and is what
 /// wgpu 30 matches.
 pub use winit::window::Window;
 

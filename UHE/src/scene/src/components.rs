@@ -1,14 +1,14 @@
 //! The component set. Names follow the crate-map contract (`Transform`, not
-//! `TransformComponent`); the `.unhuman` field names stay the C++ ones and live
-//! in [`crate::serialize`].
+//! `TransformComponent`); the `.unhuman` field names live in
+//! [`crate::serialize`].
 
 use glam::{Mat4, Quat, Vec2, Vec3, Vec4};
 
 use crate::entity::Entity;
 use crate::scene::Scene;
 
-/// Port of `TransformComponent`. `rotation` is Euler **degrees** — the C++
-/// header says so, and `glm::quat(Rotation)` treats them that way.
+/// `rotation` is Euler **degrees**, the unit the `.unhuman` format stores and
+/// the one a quaternion is built from.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Transform {
     pub translation: Vec3,
@@ -38,13 +38,12 @@ impl Transform {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation_quat(), self.translation)
     }
 
-    /// Inverse of [`matrix`](Self::matrix) — what a camera's view matrix is.
+    /// Inverse of [`matrix`](Self::matrix): what a camera's view matrix is.
     pub fn view_matrix(&self) -> Mat4 {
         self.matrix().inverse()
     }
 
-    /// `glm::quat(vec3)` from `glm/gtx/quaternion.hpp`: the C++ builds it in the
-    /// X-then-Y-then-Z order, which glam's `EulerRot` sequences do not
+    /// Built in X-then-Y-then-Z order, which glam's `EulerRot` sequences do not
     /// reproduce, so the formula is written out.
     pub fn rotation_quat(&self) -> Quat {
         let (x, y, z) = (
@@ -64,7 +63,7 @@ impl Transform {
     }
 }
 
-/// Port of `TagComponent`.
+/// An entity's tag string.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Tag {
     pub tag: String,
@@ -76,16 +75,15 @@ impl Tag {
     }
 }
 
-/// Port of `IDComponent`: one real unique id per entity. There is deliberately
-/// no `Default` — the C++ comment records that defaulting to 0 made every
-/// entity share identity 0, so every id-based lookup silently returned the
-/// first entity.
+/// One real unique id per entity. There is deliberately no `Default`:
+/// defaulting to 0 would make every entity share identity 0, so every id-based
+/// lookup would silently return the first entity.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Id(pub u64);
 
-/// The 3D mesh on an entity. The C++ spread this over `Model3DComponent` and
-/// `ModelNodeComponent`; the loader expands glTF nodes into one entity per node,
-/// so a handle, an optional material and how it shades is the whole component.
+/// The 3D mesh on an entity. The loader expands glTF nodes into one entity per
+/// node, so a handle, an optional material and how it shades is the whole
+/// component.
 #[derive(Clone, PartialEq, Debug)]
 pub struct MeshRenderer {
     /// Filled by [`Scene::resolve_assets`]; `None` until then, and `None`
@@ -115,7 +113,7 @@ impl Default for MeshRenderer {
     }
 }
 
-/// Port of `SpriteRendererComponent`.
+/// A 2D sprite: a colour, an optional texture and sub-texture sampling.
 #[derive(Clone, PartialEq, Debug)]
 pub struct SpriteRenderer {
     pub color: Vec4,
@@ -143,8 +141,8 @@ impl Default for SpriteRenderer {
     }
 }
 
-/// Port of `TextComponent`. `font_path` is the C++ `FontAssetPath`; the handle
-/// beside it is filled by [`Scene::resolve_assets`].
+/// `font_path` is the `.unhuman` `FontAssetPath`; the handle beside it is filled
+/// by [`Scene::resolve_assets`].
 #[derive(Clone, PartialEq, Debug)]
 pub struct Text {
     pub text: String,
@@ -168,9 +166,8 @@ impl Default for Text {
     }
 }
 
-/// Port of `DirectionalLightComponent` / `PointLightComponent` /
-/// `SpotLightComponent` as one component; the C++ allowed an entity to carry
-/// several light components at once, which nothing did.
+/// One light component for all three kinds. Carrying several light components
+/// on one entity was legal but nothing did it, so the kinds fold into one.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum LightKind {
     Directional,
@@ -178,8 +175,8 @@ pub enum LightKind {
     Spot,
 }
 
-/// Port of the three light components. Cone angles are **degrees** here, where
-/// the C++ stored radians for the KHR_lights_punctual parity.
+/// Cone angles are **degrees** here, converted to radians for the
+/// KHR_lights_punctual parity.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Light {
     pub kind: LightKind,
@@ -199,7 +196,7 @@ impl Default for Light {
             color: Vec3::ONE,
             intensity: 1.0,
             radius: 10.0,
-            // 0.2617994 rad and 0.5235988 rad in the C++ header.
+            // Radian equivalents: 0.2617994 and 0.5235988.
             inner_cone_angle: 15.0,
             outer_cone_angle: 30.0,
             enabled: true,
@@ -207,8 +204,7 @@ impl Default for Light {
     }
 }
 
-/// Port of the `BodyType` nested enum shared by `RigidBody2DComponent` and
-/// `RigidBody3DComponent`.
+/// Rigid body simulation mode: static, kinematic or dynamic.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RigidBodyKind {
     Static,
@@ -216,9 +212,8 @@ pub enum RigidBodyKind {
     Dynamic,
 }
 
-/// Port of `RigidBody3DComponent` — the 3D path is the product, so the 2D body
-/// is not carried over. `velocity` and `gravity_scale` are the fields the
-/// physics backend owns; `damping` is the C++ `LinearDamping`.
+/// A rigid body. `velocity` and `gravity_scale` are the fields the physics
+/// backend owns; `damping` is the `.unhuman` `LinearDamping`.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct RigidBody {
     pub kind: RigidBodyKind,
@@ -240,8 +235,7 @@ impl Default for RigidBody {
     }
 }
 
-/// Port of `BoxCollider3DComponent` / `SphereCollider3DComponent` /
-/// `CapsuleCollider3DComponent` as one component.
+/// The collider's shape and its dimensions.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ColliderShape {
     Box {
@@ -265,7 +259,7 @@ impl Default for ColliderShape {
     }
 }
 
-/// Port of the three 3D collider components.
+/// A collider's shape, offset and surface properties.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Collider {
     pub shape: ColliderShape,
@@ -285,8 +279,7 @@ impl Default for Collider {
     }
 }
 
-/// The C++ tree has no audio component — audio was driven from code. This is
-/// what the port gives `wire` to read.
+/// What the `wire` audio backend reads: a clip, playback flags and gain.
 #[derive(Clone, PartialEq, Debug)]
 pub struct AudioSource {
     pub clip: Option<vault::AssetId>,
@@ -315,14 +308,12 @@ impl Default for AudioSource {
     }
 }
 
-/// Port of `AnimatorComponent`, flattened to the fields a renderer needs. The
-/// C++ kept a `Ref<RD3d::Animator>` runtime object and mirrored eight
-/// parameters onto it; the runtime object is `bifrost`'s, so only the state
-/// lives here.
+/// The playback state a renderer needs. The runtime animator object belongs to
+/// `bifrost`, so only the state lives here.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Animator {
     pub clip: Option<vault::AssetId>,
-    /// The C++ `CurrentAnimationName`.
+    /// The `.unhuman` `CurrentAnimationName`.
     pub clip_path: String,
     pub time: f32,
     pub speed: f32,
@@ -366,8 +357,7 @@ impl From<&Animator> for AnimatorState {
     }
 }
 
-/// Port of `SpriteAnimationComponent` plus the playback clock the C++
-/// `SpriteAnimation` kept internally.
+/// A sprite-sheet animation: frame extents, timing, and the playback clock.
 #[derive(Clone, PartialEq, Debug)]
 pub struct SpriteAnimation {
     pub sprite_sheet_path: String,
@@ -410,21 +400,20 @@ impl SpriteAnimation {
     }
 }
 
-/// Behaviour attached to an entity. Replaces the C++ `NativeScriptComponent`'s
-/// `InstantiateScript` / `DestroyScript` function pointers and the raw
-/// `ScriptableEntity*` they owned — the one place this port deliberately
-/// changes shape, because that ownership was the C++'s unsafe part.
+/// Behaviour attached to an entity. Function pointers plus a raw
+/// `ScriptableEntity*` would own a lifetime; a `Box<dyn Script>` owns its own
+/// state instead.
 pub trait Script: Send + Sync {
     fn on_create(&mut self, entity: Entity, scene: &mut Scene);
     fn on_update(&mut self, entity: Entity, scene: &mut Scene, dt: f32);
     fn on_destroy(&mut self, entity: Entity, scene: &mut Scene);
 }
 
-/// Port of `NativeScriptComponent`.
+/// A boxed script, created when the entity is first updated.
 pub struct NativeScript {
     pub script: Box<dyn Script>,
-    /// `on_create` fires on the first [`Scene::update_scripts`], which is where
-    /// the C++ instantiated lazily.
+    /// `on_create` fires on the first [`Scene::update_scripts`], not at
+    /// insertion.
     created: bool,
 }
 
@@ -457,8 +446,8 @@ mod tests {
 
     #[test]
     fn euler_order_matches_glm() {
-        // glm::quat(vec3(90, 90, 0)) for the X-then-Y-then-Z order the C++
-        // header's `glm::quat(Rotation)` uses.
+        // Euler (90, 90, 0) in X-then-Y-then-Z order gives (0.5, 0.5, -0.5,
+        // 0.5).
         let transform = Transform {
             rotation: Vec3::new(90.0, 90.0, 0.0),
             ..Transform::default()

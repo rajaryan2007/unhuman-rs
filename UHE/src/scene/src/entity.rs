@@ -36,7 +36,7 @@ impl<'a> EntityRef<'a> {
         self.entity
     }
 
-    /// The `Id` component — the identity that survives a save.
+    /// The `Id` component: the identity that survives a save.
     pub fn id(&self) -> Option<u64> {
         self.get::<Id>().map(|id| id.0)
     }

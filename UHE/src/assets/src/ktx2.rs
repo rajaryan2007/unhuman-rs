@@ -1,11 +1,10 @@
 //! KTX2 container parsing.
 //!
-//! Port of `UHE/src/UHE/Renderer/KTX2.{h,cpp}`, minus the transcode. The C++
-//! handed the bytes to `basisu_transcoder`, which is a C++-only library pulled
-//! in at build time; `docs/architecture/01-crate-map.md` records `basis_universal`
-//! as deliberately not ported. What is portable is the container: header, level
-//! index, DFD presence, and the mip chain — everything a plain, uncompressed
-//! (or RDO-compressed-then-inflated-by-the-author) KTX2 needs, and everything
+//! Container only, no transcode: decoding a Basis payload needs
+//! `basisu_transcoder`, a non-Rust library with no crate equivalent, and
+//! `docs/architecture/01-crate-map.md` records `basis_universal` as deliberately
+//! not ported. What is portable is the header, level index, DFD presence, and
+//! the mip chain: everything a plain, uncompressed KTX2 needs, and everything
 //! needed to *refuse* a Basis payload with a reason instead of handing a
 //! renderer bytes it will upload as noise.
 
@@ -41,10 +40,10 @@ const MAX_LEVELS: u32 = 32;
 
 /// A decoded KTX2 texture: level 0 plus every level the file carried.
 ///
-/// The C++ `KTX2Image` kept the chain when the file shipped one, so a
-/// file-authored chain uploads directly and the GPU generator stays idle —
-/// recomputing it would both waste the time and discard the author's filter.
-/// `rgba8` aliases level 0 for a caller that never looks further.
+/// The authored chain is kept when the file ships one, so it uploads directly
+/// and the GPU generator stays idle: recomputing it would both waste the time
+/// and discard the author's filter. `rgba8` aliases level 0 for a caller that
+/// never looks further.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ktx2Image {
     pub width: u32,
@@ -161,7 +160,7 @@ pub fn load_ktx2(data: &[u8]) -> Result<Ktx2Image> {
     // The data format descriptor is where a Basis payload says which encoding it
     // carries, and where the swizzle and channel meanings of a plain one live.
     // Every format this build accepts is fully described by `vkFormat` alone, so
-    // the descriptor is only range-checked here — a file that points it outside
+    // the descriptor is only range-checked here; a file that points it outside
     // itself is malformed whatever the payload is.
     let dfd_offset = header(48)?;
     let dfd_length = header(52)?;

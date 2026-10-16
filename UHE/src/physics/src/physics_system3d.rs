@@ -1,20 +1,13 @@
 //! The 3D world: bodies in, transforms out.
 //!
-//! Port of `UHE/src/UHE/Physics/PhysicsSystem3D.cpp,h`, plus the per-body work the C++
-//! kept in the scene: body creation in `Scene::OnRuntimeStart` (`Scene.cpp:1368-1450`)
-//! and the write-back in `Scene::OnUpdateRuntime` (`Scene.cpp:1254-1279`). A backend
-//! that is a plugin owns both, because the C++'s `PhysicsSystem3D` was a member of
-//! `Scene` (`Scene.h:175`) and reached into the registry itself.
-//!
 //! Sync is per step, both directions, in that order: scene -> Rapier, step, Rapier ->
 //! scene. Two markers make an unchanged body cost nothing and a user edit survive:
 //!
-//! * `Entry::source` — everything the body was built from. Equal to the scene's current
+//! * `Entry::source`: everything the body was built from. Equal to the scene's current
 //!   description means the body is left alone; a difference rebuilds it.
-//! * `Entry::written` — the pose this backend last put in the scene. A scene pose that
+//! * `Entry::written`: the pose this backend last put in the scene. A scene pose that
 //!   disagrees is an editor edit, and it is pushed into Rapier rather than overwritten by
-//!   the next step. The C++ had no such marker, which is why dragging a body in the
-//!   editor had no effect.
+//!   the next step.
 
 use std::collections::HashMap;
 
@@ -29,22 +22,19 @@ use rapier3d::prelude::{
 
 use crate::shape::{Refusal, ShapeSlot};
 
-/// Jolt's default gravity. `PhysicsSystem3D` never called `SetGravity`, so the 3D world
-/// ran at the library default; the `-9.8` in the C++ (`Scene.cpp:1318`) was the Box2D
-/// world's, and 2D is not ported.
+/// Jolt's default gravity, which the 3D world used. Box2D's `-9.8` is the 2D value,
+/// and this backend is 3D only.
 pub const GRAVITY: Vec3 = Vec3::new(0.0, -9.81, 0.0);
 
-/// The C++'s defaults for a body whose shape came out of its `if`/`else if` chain
-/// (`Scene.cpp:1379-1380`); the collider component overrode them.
+/// Defaults for a body whose collider component does not override them.
 const DEFAULT_FRICTION: f32 = 0.2;
 const DEFAULT_RESTITUTION: f32 = 0.0;
 
 /// A body in the Rapier world.
 ///
-/// The C++ kept `JPH::BodyID` in `RigidBody3DComponent::RuntimeBodyID` — a `u32` hole in
-/// a scene component, so a serialised scene carried a stale index into a world that no
-/// longer existed. Here the id stays in the backend and the component stays a
-/// description, which is also what keeps `meats` free of any dependency on `rapier3d`.
+/// The id stays in the backend and the scene component stays a description, so a
+/// serialised scene never carries a stale index, and `meats` stays free of any
+/// dependency on `rapier3d`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BodyHandle(RigidBodyHandle);
 
@@ -71,7 +61,7 @@ impl Physics3D {
             pipeline: PhysicsPipeline::new(),
             // One fixed parameter set for the world's whole life: the step length is the
             // only thing `step` touches. That, and one pipeline, is what makes two runs of
-            // the same scene produce the same numbers — Rapier holds no generator of its
+            // the same scene produce the same numbers: Rapier holds no generator of its
             // own, so there is nothing else to seed.
             params: IntegrationParameters::default(),
             islands: IslandManager::new(),
@@ -149,9 +139,8 @@ impl Physics3D {
             let Some(entry) = self.entries.get_mut(&entity) else {
                 continue;
             };
-            // Static bodies are never moved by the simulation, and the C++ skipped them by
-            // way of `IsActive` (`Scene.cpp:1269`); skipping here also leaves a static
-            // body's pose bit-identical to what the scene asked for.
+            // Static bodies are never moved by the simulation, and skipping them leaves
+            // a static body's pose bit-identical to what the scene asked for.
             if entry.source.kind == RigidBodyKind::Static {
                 continue;
             }
@@ -192,7 +181,7 @@ impl Physics3D {
         .pose(rapier_pose(pose))
         .linvel(source.velocity)
         .gravity_scale(source.gravity_scale)
-        // One `damping` on the component, the C++'s two equal ones (0.05 and 0.05).
+        // One `damping` on the component drives both linear and angular damping.
         .linear_damping(source.damping)
         .angular_damping(source.damping);
         let handle = self.bodies.insert(body);
@@ -202,9 +191,8 @@ impl Physics3D {
             .restitution(source.restitution)
             .translation(source.offset);
         if source.kind == RigidBodyKind::Dynamic {
-            // Jolt: `CalculateInertia` with `mMassPropertiesOverride.mMass`
-            // (`Scene.cpp:1445-1450`) — a mass the component states, an inertia the shape
-            // implies, which is what a collider mass is in Rapier.
+            // Jolt set the body's mass from the component and left inertia to the
+            // shape; a Rapier collider mass is the same split.
             collider = collider.mass(source.mass);
         }
         self.colliders
@@ -249,8 +237,8 @@ impl Physics3D {
         let Some(handle) = entry.body else {
             return;
         };
-        // `true`: an entity that lost its `RigidBody` should not leave its collider in the
-        // world, which is what the C++ did by never removing either.
+        // `true`: an entity that lost its `RigidBody` should not leave its collider in
+        // the world.
         self.bodies.remove(
             handle,
             &mut self.islands,
@@ -282,9 +270,8 @@ impl PhysicsBackend for Physics3D {
         // step as "apply the changes, detect collisions, advance nothing").
         self.params.dt = dt.max(0.0);
 
-        // The C++'s two layers (NON_MOVING/MOVING, `PhysicsSystem3D.cpp:29-38`) have no
-        // counterpart here: they only said fixed bodies do not pair with fixed bodies, and
-        // Rapier's solver already generates no constraint for such a pair.
+        // Rapier's solver already generates no constraint between two fixed bodies, so
+        // no collision layers are needed to exclude that pair.
         self.pipeline.step(
             GRAVITY,
             &self.params,
@@ -335,9 +322,9 @@ struct Source {
     shape: ShapeSlot,
 }
 
-/// A pose as the scene stores one: a translation, and `Transform::rotation` — Euler
-/// **degrees**, in the `glm::quat(vec3)` order `Transform::rotation_quat` is the forward
-/// half of.
+/// A pose as the scene stores one: a translation, and `Transform::rotation`, Euler
+/// **degrees** in the `Rz*Ry*Rx` order `Transform::rotation_quat` is the forward half
+/// of.
 ///
 /// The comparison that catches an editor edit is between this and what the backend last
 /// wrote, so it stays in the scene's own representation: writing the angles back is what
@@ -353,9 +340,9 @@ struct ScenePose {
 /// Euler degrees to Rapier's quaternion, through `meats`' own conversion.
 ///
 /// `Transform::rotation_quat` and not `Quat::from_euler(EulerRot::XYZ)`: the scene stores
-/// the C++ `glm::quat(vec3)` order, which is `Rz*Ry*Rx` — the composition glam names
-/// `EulerRot::XYZEx`, not the `Rx*Ry*Rz` of its `XYZ`. Either way the convention is
-/// `meats`', so the conversion lives there and this only takes it.
+/// the `Rz*Ry*Rx` order, the composition glam names `EulerRot::XYZEx`, not the `Rx*Ry*Rz`
+/// of its `XYZ`. Either way the convention is `meats`', so the conversion lives there and
+/// this only takes it.
 fn rapier_pose(pose: ScenePose) -> Pose {
     let transform = Transform {
         translation: Vec3::ZERO,
@@ -400,8 +387,8 @@ fn read_source(scene: &Scene, entity: Entity) -> Option<(Source, ScenePose)> {
             .as_ref()
             .map_or(DEFAULT_RESTITUTION, |c| c.restitution),
         offset: collider.as_ref().map_or(Vec3::ZERO, |c| c.offset),
-        // The C++ ignored the component's `Offset` when it built the shape; carrying it
-        // through as the collider's position on the body is what the field is for.
+        // The component's `Offset` becomes the collider's position on the body, which is
+        // what the field is for.
         shape: ShapeSlot::from_collider(collider.as_deref(), transform.scale),
     };
     Some((source, pose))
@@ -409,9 +396,8 @@ fn read_source(scene: &Scene, entity: Entity) -> Option<(Source, ScenePose)> {
 
 /// Writes the simulated pose back, leaving the scale alone.
 ///
-/// The C++ went through Euler angles on the way out (`glm::eulerAngles`,
-/// `Scene.cpp:1273`) because the component stores them; the port keeps that shape, and
-/// both directions go through the one convention `meats` defines.
+/// The scene stores Euler angles, so both directions go through the one convention
+/// `meats` defines.
 fn write_pose(scene: &mut Scene, entity: Entity, pose: ScenePose) {
     let Some(mut built) = scene.get_mut(entity) else {
         return;

@@ -2,9 +2,8 @@ use std::collections::HashSet;
 
 use pings::{KeyCode, MouseButton};
 
-/// Every name `UHE/src/UHE/Core/keyCodes.h` declares, in its order, with the
-/// variant it became. The two renames: `D0`..`D9` are `Num0`..`Num9`, and the
-/// `KP*` keypad keys are `Keypad*`.
+/// Every key name, in order, with the variant it became. The two renames:
+/// `D0`..`D9` are `Num0`..`Num9`, and the `KP*` keypad keys are `Keypad*`.
 const KEY_CODES: &[(&str, KeyCode)] = &[
     ("Space", KeyCode::Space),
     ("Apostrophe", KeyCode::Apostrophe),

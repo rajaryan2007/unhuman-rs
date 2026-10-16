@@ -2,9 +2,8 @@ use std::fmt;
 
 /// Everything an asset operation can fail with.
 ///
-/// The C++ loaders returned a null `Ref<void>` and logged, so "which asset,
-/// and why" was only ever answered by a log line. A load failure here says what
-/// happened.
+/// Returning a null handle and logging would answer "which asset, and why" only
+/// in a log line; a load failure here says what happened.
 #[derive(Debug)]
 pub enum Error {
     /// No mount root holds the path. Not the same as an I/O failure: the file

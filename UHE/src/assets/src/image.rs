@@ -2,10 +2,8 @@ use crate::error::{Error, Result};
 
 /// A decoded 8-bit RGBA image, raster order, `rgba8.len() == width * height * 4`.
 ///
-/// The C++ handed a `Texture2D` (an uploaded device texture) to anything that
-/// wanted pixels, so nothing without a device could look at one. This is the
-/// CPU half of `Texture.cpp`: stb/KTX2 decoded bytes and an extent, with the
-/// colour space carried as a flag instead of baked into a sampler.
+/// Device-free on purpose: decoded bytes and an extent, with the colour space
+/// carried as a flag instead of baked into a sampler.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Image {
     pub width: u32,
@@ -26,16 +24,13 @@ impl Image {
 }
 
 /// Byte size of an RGBA8 image of the given dimensions.
-///
-/// The counterpart of `RGBA8Size` (`Mipmap.h:56`).
 pub const fn rgba8_size(width: u32, height: u32) -> usize {
     width as usize * height as usize * 4
 }
 
 /// Decodes PNG/JPEG/BMP/TGA bytes to RGBA8.
 ///
-/// The C++ went through stb_image for every path including KTX2's fallback. One
-/// entry point for all four encodings is what makes "decode these bytes" a
+/// One entry point for all four encodings is what makes "decode these bytes" a
 /// question with one answer; `image` picks the codec from the bytes themselves,
 /// so a `.png` named `.jpg` still decodes.
 pub fn decode_image(bytes: &[u8], srgb: bool) -> Result<Image> {
@@ -74,8 +69,6 @@ pub struct MipLevel {
 /// generated on device are the same pixels. Odd source edges duplicate their
 /// last texel, matching how the block formats and the KTX2 container size
 /// their levels.
-///
-/// Port of `DownsampleRGBA8` (`Mipmap.cpp:19`).
 pub fn downsample_rgba8(source: &[u8], width: u32, height: u32) -> Option<MipLevel> {
     if width == 0 || height == 0 || source.len() < rgba8_size(width, height) {
         return None;
@@ -117,8 +110,7 @@ pub fn downsample_rgba8(source: &[u8], width: u32, height: u32) -> Option<MipLev
     })
 }
 
-/// Mean of four channel values, rounded to nearest as the C++ did
-/// (`(sum + 2) / 4`).
+/// Mean of four channel values, rounded to nearest (`(sum + 2) / 4`).
 fn average(a: u8, b: u8, c: u8, d: u8) -> u8 {
     ((a as u32 + b as u32 + c as u32 + d as u32 + 2) / 4) as u8
 }
@@ -126,9 +118,8 @@ fn average(a: u8, b: u8, c: u8, d: u8) -> u8 {
 /// Full chain: level 0 is a copy of the source, then repeated halving until
 /// 1x1. A 1x1 source yields exactly one level.
 ///
-/// Port of `GenerateMipmapChainRGBA8` (`Mipmap.cpp:68`). CPU-side and
-/// device-free on purpose: the headless harness, editor thumbnails and offline
-/// export all need a chain and none of them has a device.
+/// CPU-side and device-free on purpose: the headless harness, editor thumbnails
+/// and offline export all need a chain and none of them has a device.
 pub fn generate_mipmap_chain_rgba8(source: &[u8], width: u32, height: u32) -> Vec<MipLevel> {
     let mut chain = Vec::new();
     if source.is_empty() || width == 0 || height == 0 || source.len() < rgba8_size(width, height) {

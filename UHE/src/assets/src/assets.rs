@@ -15,8 +15,8 @@ use crate::vfs::Vfs;
 /// What a finished load reports: the kind that landed, or why it did not.
 ///
 /// A plain `Result` rather than a bespoke enum, because that is how a caller
-/// wants to read it — `for (id, result) in assets.poll() { if let Err(error) =
-/// result { … } }`.
+/// wants to read it: `for (id, result) in assets.poll() { if let Err(error) =
+/// result { ... } }`.
 pub type LoadResult = std::result::Result<AssetKind, Error>;
 
 /// Everything one load produced.
@@ -78,16 +78,14 @@ impl Slot {
 
 /// The asset registry.
 ///
-/// Port of `AssetManager` (`UHE/src/UHE/AssestsManager/AssetManager.{h,cpp}`),
-/// with the parts the C++ needed and this design does not: no `shared_ptr`
-/// refcount per asset (the registry owns every payload and a handle is an
-/// index), no `finalized` flag (there is no GPU upload step in this crate, so
-/// "decoded" is the whole of "ready"), and no mutex (a registry is reached
-/// through `&mut Assets`, which is the one owner the spine asks for).
+/// Deliberately simpler than a refcounted manager: no `shared_ptr` per asset
+/// (the registry owns every payload and a handle is an index), no `finalized`
+/// flag (there is no GPU upload step in this crate, so "decoded" is the whole
+/// of "ready"), and no mutex (a registry is reached through `&mut Assets`,
+/// which is the one owner the spine asks for).
 ///
-/// `IDEA.md:61` is why this exists at all: the C++ was path-based with no
-/// registry, so every call re-walked a `path -> ID` map and every handle had to
-/// re-check a generation counter on a shared record.
+/// A path-keyed registry exists so a call does not re-walk a `path -> ID` map
+/// and every handle does not re-check a generation counter on a shared record.
 pub struct Assets {
     vfs: Vfs,
     slots: Vec<Slot>,
@@ -142,8 +140,7 @@ impl Assets {
     ///
     /// A second load of the same path returns the first id rather than decoding
     /// twice; an id whose slot a `load_async` already owns is returned in its
-    /// current (possibly not yet decoded) state, which is what the C++ did when
-    /// it found a record mid-decode.
+    /// current (possibly not yet decoded) state.
     pub fn load(&mut self, path: &str) -> Result<AssetId> {
         if let Some(id) = self.live_id(path) {
             return Ok(id);
@@ -155,11 +152,10 @@ impl Assets {
 
     /// Submits a load to the job system and returns its id immediately.
     ///
-    /// The worker reads the file and decodes it — CPU work only, exactly the
-    /// contract `IAssetLoader::LoadFromFile` had in C++ — and hands the result
-    /// back through a channel that [`Assets::poll`] drains. A load that fails is
-    /// reported once, and its slot is released, so nothing is re-delivered
-    /// forever.
+    /// The worker reads the file and decodes it (CPU work only) and hands the
+    /// result back through a channel that [`Assets::poll`] drains. A load that
+    /// fails is reported once, and its slot is released, so nothing is
+    /// re-delivered forever.
     pub fn load_async(&mut self, jobs: &Jobs, path: &str) -> Result<AssetId> {
         if let Some(id) = self.live_id(path) {
             let kind = self.slot(id).map(|slot| slot.kind);
@@ -414,11 +410,10 @@ impl Assets {
 
 /// The kind a virtual path's extension names.
 ///
-/// The C++ chose a loader from the payload type the caller asked for
-/// (`Load<TextAsset>`), which cannot be right for a registry keyed by path: the
-/// path is the only thing a caller has. Unknown extensions are [`AssetKind::Binary`]
-/// rather than an error, because a `.bin` nobody can decode is still worth
-/// having the bytes of.
+/// Choosing a loader from the payload type the caller asked for cannot be right
+/// for a registry keyed by path, because the path is the only thing a caller
+/// has. Unknown extensions are [`AssetKind::Binary`] rather than an error,
+/// because a `.bin` nobody can decode is still worth having the bytes of.
 fn classify(path: &str) -> AssetKind {
     let extension = path
         .rsplit_once('.')
