@@ -15,7 +15,7 @@ mod viewport;
 use gpui::{px, size, App, AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions};
 
 fn main() {
-    env_logger::init();
+    adam::logging::init();
 
     gpui_platform::application().run(|cx: &mut App| {
         let bounds = Bounds::centered(None, size(px(1440.0), px(900.0)), cx);

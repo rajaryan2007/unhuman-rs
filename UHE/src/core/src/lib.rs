@@ -9,6 +9,7 @@ pub mod app;
 pub mod backend;
 pub mod engine;
 pub mod error;
+pub mod logging;
 pub mod plugin;
 pub mod time;
 

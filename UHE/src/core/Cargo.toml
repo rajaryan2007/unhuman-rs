@@ -15,3 +15,4 @@ meats = { workspace = true }
 vault = { workspace = true }
 glam = { workspace = true }
 log = { workspace = true }
+env_logger = { workspace = true }

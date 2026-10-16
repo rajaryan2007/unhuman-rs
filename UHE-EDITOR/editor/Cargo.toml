@@ -15,7 +15,6 @@ bifrost = { workspace = true }
 mirror = { workspace = true }
 chassis = { workspace = true }
 log = { workspace = true }
-env_logger = { workspace = true }
 
 [dependencies.gpui]
 git = "https://github.com/zed-industries/zed"

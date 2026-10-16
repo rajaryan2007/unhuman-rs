@@ -103,6 +103,7 @@ name = "adam"
 version = "0.1.0"
 dependencies = [
  "chassis",
+ "env_logger",
  "eyes",
  "glam 0.33.12",
  "grind",
@@ -1620,7 +1621,6 @@ dependencies = [
  "bifrost",
  "chassis",
  "engine",
- "env_logger",
  "gpui",
  "gpui_platform",
  "log",
@@ -3809,7 +3809,6 @@ version = "0.1.0"
 dependencies = [
  "adam",
  "aimlab",
- "env_logger",
  "femur",
  "log",
  "meats",
@@ -5538,7 +5537,6 @@ dependencies = [
  "bifrost",
  "chassis",
  "engine",
- "env_logger",
  "eyes",
  "femur",
  "log",

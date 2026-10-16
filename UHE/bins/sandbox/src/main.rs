@@ -39,7 +39,7 @@ The backend is also readable from UHE_BACKEND and from the `backend` key in the
 settings file; the flag wins.";
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    adam::logging::init();
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     if arguments.iter().any(|a| a == "--help" || a == "-h") {

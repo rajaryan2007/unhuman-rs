@@ -14,7 +14,7 @@ use femur::FemurPlugin;
 use wire::WirePlugin;
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    adam::logging::init();
 
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let config = match Config::parse(&arguments) {

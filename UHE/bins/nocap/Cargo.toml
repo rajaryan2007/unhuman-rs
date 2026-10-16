@@ -14,4 +14,3 @@ wire = { workspace = true }
 femur = { workspace = true }
 aimlab = { workspace = true }
 log = { workspace = true }
-env_logger = { workspace = true }
