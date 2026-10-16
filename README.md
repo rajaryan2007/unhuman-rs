@@ -23,11 +23,12 @@ UHE/src/assets/        vault      asset registry, VFS, loaders
 UHE/src/renderer/      bifrost    the renderer frontend
 UHE/src/audio/         wire       audio
 UHE/src/physics/       femur      rigid bodies and colliders
-UHE/src/editor/        mirror     the editor model
 UHE/Stormbreaker/wgpu/    stormglass    the wgpu backend (default)
 UHE/Stormbreaker/vulkan/  stormbreaker  the Vulkan backend (opt-in)
-UHE/bins/               nocap (headless), sandbox (windowed), editor (gpui)
-UHE/games/aimlab/       the UHEGAME demo, as a plugin
+UHE/bins/               nocap (headless), sandbox (windowed)
+UHE-EDITOR/mirror/      mirror     the editor model
+UHE-EDITOR/editor/      editor     the gpui editor binary
+UHE-AIMLAB/aimlab/      the UHEGAME demo, as a plugin
 ```
 
 `docs/architecture/01-crate-map.md` is the interface contract every crate is written
@@ -74,3 +75,13 @@ builds clean: `cargo build --workspace` (and `--all-targets`, `--release`,
 `--locked`), `clippy -D warnings` and `rustfmt --check` all pass, and the
 driver-free suite is green. The backend suite runs in CI against lavapipe. The
 seams are documented and the tests exist; `docs/WORK.md` is the state of the work.
+
+## Contributing
+
+Contributions are accepted under the terms of [`CLA.md`](./CLA.md); sign off your
+commits (`git commit -s`) or state your agreement on the pull request.
+
+## License
+
+Licensed under the Apache License, Version 2.0 — see [`LICENSE`](./LICENSE) and
+[`NOTICE`](./NOTICE).
