@@ -1,23 +1,22 @@
 //! One logging setup, so every binary prints the same shape.
 //!
-//! Output is one line per record, spdlog-shaped:
+//! One line per record:
 //!
 //! ```text
 //! [2026-10-16 16:43:50.123] [info ] editor::app: editor renderer: AMD Radeon Graphics
 //! ```
 //!
-//! The default level is `info`. A short list of third-party crates that log at
-//! `info` on their own is quieted to `warn`, so a default run is the engine's own
-//! output rather than the accessibility bus and the Wayland span trace. `RUST_LOG`
-//! overrides all of it, read exactly as `env_logger` reads it.
+//! Default level is `info`. Third-party crates that log at `info` are quieted
+//! to `warn`, so a default run is the engine's output rather than the
+//! accessibility bus and the Wayland span trace. `RUST_LOG` overrides it, read
+//! exactly as `env_logger` reads it.
 
 use std::io::Write;
 
 use log::LevelFilter;
 
-/// Crates whose `info` output is noise for an engine. They arrive with the
-/// windowing stack, not with the engine, and none of them is something a frame
-/// has to say. A caller who wants them sets `RUST_LOG`.
+/// Crates whose `info` output is noise for an engine, all arriving with the
+/// windowing stack. A caller who wants them sets `RUST_LOG`.
 const QUIET: &[&str] = &[
     "zbus",
     "zvariant",
@@ -40,8 +39,8 @@ pub fn init() {
         builder.filter_module(name, LevelFilter::Warn);
     }
     builder.format(|buf, record| {
-        // `env_logger`'s timestamp is RFC3339 (`2026-10-16T16:43:50.123Z`); the
-        // space and the dropped `Z` are the shape spdlog prints.
+        // `env_logger`'s timestamp is RFC3339; the space and the dropped `Z`
+        // are the shape this log uses.
         let stamp = buf
             .timestamp_millis()
             .to_string()

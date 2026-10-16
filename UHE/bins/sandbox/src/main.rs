@@ -1,14 +1,11 @@
 //! Windowed binary: a real window, a real swapchain, one frame loop.
 //!
-//! The C++ sandbox pushed one layer that loaded a glTF and drew it; this is that
-//! with the layer replaced by plugins, and with the same frame the engine's
-//! headless run uses — `App::frame` — so the two binaries differ only in what
-//! they put in `Engine::gpu`.
+//! Uses the same frame as the headless run, `App::frame`, so the two binaries
+//! differ only in what they put in `Engine::gpu`.
 //!
-//! The GPU cannot exist before the window does: a `wgpu` surface is created from
-//! a `winit` window and the window is winit's, handed over inside the frame
-//! callback. So `App::start` is called from the first frame, once there is a
-//! device for the plugins to build against.
+//! The GPU cannot exist before the window: a `wgpu` surface is created from the
+//! `winit` window, handed over inside the frame callback. `App::start` runs from
+//! the first frame, once there is a device for plugins to build against.
 
 use std::sync::{Arc, Mutex};
 

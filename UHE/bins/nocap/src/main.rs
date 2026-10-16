@@ -1,9 +1,7 @@
 //! Headless binary: the same frame loop with no window and no GPU.
 //!
-//! The C++ sandbox ran one layer that drew a model into a window; the headless
-//! use of it is the same thing without the window, so this is that: the engine
-//! with `gpu: None`, the game plugins registered, a fixed number of steps, and a
-//! summary line instead of a dump of ImGui panels.
+//! The engine with `gpu: None`, the game plugins registered, a fixed number of
+//! steps, and a summary line instead of editor panels.
 
 mod config;
 
@@ -42,8 +40,7 @@ fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         .add(WirePlugin::new())
         .add(FemurPlugin);
 
-    // The repository's `assets/` is where the relative paths in a scene and in
-    // aimlab resolve from, exactly as in the editor binary.
+    // Scene and aimlab paths resolve from the repository's `assets/`.
     app.engine_mut().assets.mount("assets");
 
     log::info!("nocap: plugins {}", app.plugin_names().join(", "));
@@ -67,8 +64,8 @@ fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     app.run(config.frames())?;
 
     let engine = app.engine();
-    // `bodies` is what the physics world holds, sleeping bodies included: there
-    // is no awake-body accessor, and zero is the honest "physics did nothing".
+    // Sleeping bodies count: there is no awake-body accessor, and zero is the
+    // honest "physics did nothing".
     println!(
         "nocap: frames={} entities={} bodies={}",
         engine.time.frame(),

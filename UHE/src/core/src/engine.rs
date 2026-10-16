@@ -9,22 +9,13 @@ use crate::time::Time;
 
 /// Everything the engine owns.
 ///
-/// **Data only.** No behavior and no plugin types: a plugin owns its own state
-/// and is handed `&mut Engine` per hook, which is what keeps `adam` free of any
-/// dependency on `bifrost`, `stormbreaker`, or anything else. In the C++ engine
-/// the equivalent type could not exist, because `Renderer3D::s_Data3D`,
-/// `AudioEngine::s_ActiveSounds` and `g_VulkanContext` were file-static globals
-/// that nothing could construct, so `tests/scene` had to recompile engine
-/// sources with a stubbed renderer instead of linking them.
+/// Data only: a plugin owns its own state and gets `&mut Engine` per hook, so
+/// `adam` depends on no plugin crate. The substitutable fields are trait
+/// objects chosen by the binary; `gpu` is `None` headless, which is the whole
+/// of "headless is the same binary".
 ///
-/// The substitutable fields are trait objects, one implementation each, chosen
-/// by the binary that builds the `App`: `gpu` is `None` in headless mode, and
-/// that is the whole of "headless is the same binary" — not a second target.
-///
-/// Field order is drop order, and it is deliberate: the GPU is dropped last, so
-/// a plugin's pipelines and buffers are destroyed while the device that made
-/// them is still alive. Declaring `gpu` first is the bug that leaked every
-/// command buffer in the Vulkan backend.
+/// Field order is drop order: the GPU drops last so a plugin's pipelines and
+/// buffers outlive the device that made them.
 pub struct Engine {
     pub jobs: Arc<Jobs>,
     pub time: Time,

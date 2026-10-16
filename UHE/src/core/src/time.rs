@@ -16,9 +16,7 @@ pub struct Time {
 }
 
 impl Time {
-    /// 60 Hz by default. The C++ engine had no accumulator at all — it clamped
-    /// a raw `glfwGetTime` delta to 0.25s and hoped
-    /// (`UHE/src/UHE/Core/Application.cpp:117-123`).
+    /// 60 Hz by default.
     pub fn new() -> Self {
         Self::with_fixed_dt(Duration::from_secs_f64(1.0 / 60.0))
     }

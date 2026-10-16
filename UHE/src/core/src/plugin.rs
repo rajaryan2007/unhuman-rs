@@ -9,8 +9,8 @@ pub struct FrameCtx {
     pub frame: u64,
     /// Real time since the previous frame, unscaled.
     pub delta: Duration,
-    /// The fixed step this hook is running under. Equals `delta` on render
-    /// frames, and `fixed_dt` on each simulation substep.
+    /// The fixed step this hook runs under: `delta` on render frames,
+    /// `fixed_dt` on each simulation substep.
     pub step: Duration,
     /// Simulation speed multiplier in effect.
     pub scale: f32,
@@ -26,22 +26,17 @@ impl FrameCtx {
 
 /// A unit of engine behavior.
 ///
-/// Plugins are compiled in, not discovered at runtime. The alternatives that
-/// genuinely swap out — a model loader, a physics backend, a UI toolkit — are
-/// sibling crates, one per alternative, and a Cargo feature picks which one
-/// exists. `NAME` gives `App::plugin_names()` and the boot log for free without
-/// a registry entry.
+/// Plugins are compiled in, not discovered at runtime; the swappable pieces (a
+/// model loader, a physics backend, a UI toolkit) are sibling crates picked by
+/// a Cargo feature.
 ///
-/// The registry lives on `App`, **beside** `Engine`, never inside it. The
-/// previous Rust attempt put plugins in a field of the same struct the hooks
-/// borrow, so iterating plugins aliased `&mut Engine` with
-/// `&mut Vec<Box<dyn Plugin>>` and needed `std::mem::take` around every loop
-/// (`crates/unhuman/src/app/app.rs:101`).
+/// The registry lives on `App`, beside `Engine`, never inside it: iterating
+/// plugins and borrowing the engine must stay disjoint.
 pub trait Plugin: Send + 'static {
     /// Plugin identifier, for `--list-plugins` and the boot log.
     ///
-    /// A method rather than `const NAME` on purpose: an associated const makes
-    /// the trait not dyn-compatible, which would defeat the registry.
+    /// A method rather than `const NAME`: an associated const would make the
+    /// trait not dyn-compatible.
     fn name(&self) -> &'static str;
 
     /// Populate the engine's data from this plugin. Called once, in
@@ -55,11 +50,9 @@ pub trait Plugin: Send + 'static {
     /// Simulation substep. Called once per fixed step, not once per frame.
     fn on_update(&mut self, _eng: &mut Engine, _ctx: &mut FrameCtx) {}
 
-    /// Once per rendered frame, after the fixed-step substeps and before
-    /// `on_render`. Frame-rate logic belongs here: editor and UI updates, and
-    /// anything that decides the frame should end. `on_update` cannot serve
-    /// this, because a frame whose accumulator has not reached one fixed step
-    /// runs no substeps at all.
+    /// Once per rendered frame, after the substeps and before `on_render`.
+    /// Frame-rate logic belongs here: `on_update` cannot serve it, because a
+    /// frame that reaches no fixed step runs no substeps at all.
     fn on_frame(&mut self, _eng: &mut Engine, _ctx: &mut FrameCtx) {}
 
     /// Record this frame's GPU work. Only called when `Engine::gpu` is `Some`.

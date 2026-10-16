@@ -1,17 +1,12 @@
 // Build smoke tests.
 //
-// These do not test behaviour. They test that the workspace *builds* in the
-// shapes it is going to be built in, which is a different failure mode from
-// anything else here and the one a CI machine finds first.
-//
-// A behavioural test suite cannot tell you that the crate compiles with a
-// feature off, or that it compiles as a dependency of something else, or that
-// it compiles for a target you do not own. Those are all build questions.
+// These test that the workspace builds in the shapes it will be built in:
+// feature combinations, dependency builds, targets. A behavioural suite cannot
+// catch those.
 
 use std::process::Command;
 
-/// Run a cargo command and return its output, failing loudly.
-/// Run cargo and capture everything it said.
+/// Run cargo and capture its combined output.
 ///
 /// `--offline` is deliberately not used: a smoke test that cannot fetch is
 /// testing the wrong thing, and CI has network.
@@ -37,8 +32,8 @@ fn assert_cargo(args: &[&str], what: &str) {
 
 /// Every crate in the workspace compiles with all targets, tests included.
 ///
-/// The `cargo build --workspace` in the gate does not build the test targets, so
-/// a broken test file can sit there for a long time unnoticed.
+/// The gate's `cargo build --workspace` skips test targets, so a broken test
+/// file can sit unnoticed.
 #[test]
 fn the_workspace_builds_with_all_targets() {
     assert_cargo(
@@ -55,13 +50,9 @@ fn the_workspace_builds_in_release() {
     assert_cargo(&["build", "--workspace", "--release"], "release build");
 }
 
-/// The doc tests build. They run in `cargo test`, but `cargo test --doc` is the
-/// only way to build them without also running everything else.
-/// Doc tests build *and* run. `--no-run` is not accepted for them, which is a
-/// confusing error rather than a useful one.
-///
-/// They are the only tests in the workspace that execute code inside a `//!`
-/// comment, so a broken example compiles fine and fails only here.
+/// Doc tests build and run; `--no-run` is not accepted for them. They are the
+/// only tests that execute code inside a `//!` comment, so a broken example
+/// compiles fine and fails only here.
 #[test]
 fn doc_tests_run() {
     let (ok, output) = cargo(&["test", "--workspace", "--doc"]);
@@ -74,10 +65,8 @@ fn doc_tests_run() {
 
 /// The pure-logic crates build with no Vulkan SDK, no cmake and no driver.
 ///
-/// This is the property that lets someone clone the repository and run the tests
-/// on a laptop. It is also the property that silently breaks when a backend
-/// crate acquires a build dependency, and the only way to notice is to build
-/// without one.
+/// This lets a fresh clone run tests on a laptop, and silently breaks when a
+/// backend crate acquires a build dependency.
 #[test]
 fn the_logic_crates_build_without_any_driver() {
     assert_cargo(
@@ -110,9 +99,8 @@ fn the_lock_file_is_current() {
     );
 }
 
-/// The workspace is formatted. Separate from clippy: rustfmt-clean and
-/// clippy-clean are different properties and only one of them was being checked
-/// until CI found the other.
+/// The workspace is formatted. rustfmt-clean and clippy-clean are different
+/// properties.
 #[test]
 fn the_workspace_is_formatted() {
     assert_cargo(&["fmt", "--all", "--check"], "rustfmt");
@@ -139,9 +127,9 @@ fn clippy_is_clean_with_warnings_denied() {
 /// disk but not listed is silently never tested.
 #[test]
 fn every_declared_member_exists_on_disk() {
-    // `CARGO_MANIFEST_DIR` is *this crate's* directory, not the workspace root,
-    // so the manifest it points at has no `[workspace]` table in it and the scan
-    // below found zero members. Walk up to the one that does.
+    // `CARGO_MANIFEST_DIR` is this crate's directory, not the workspace root,
+    // so the manifest it points at has no `[workspace]` table. Walk up to the
+    // one that does.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     let manifest = root
         .ancestors()
@@ -179,19 +167,18 @@ fn every_declared_member_exists_on_disk() {
     );
 }
 
-/// The backend crate keeps its file map in step with the C++ it was ported from.
+/// The backend crate keeps its file map in step with the sibling header tree.
 ///
-/// Not a behaviour test either. The C++ tree is a sibling checkout and may be
-/// absent, so this skips rather than fails -- but when it is present, a C++
-/// class with no Rust counterpart is exactly the kind of gap that goes unnoticed
-/// for a month, which is how `VulkanRenderPass` ended up on a "dead code, skip
-/// it" list when it was in fact the only path that works on a 1.0 device.
+/// Skips rather than fails when that tree is absent. When present, a class with
+/// no Rust counterpart is the kind of gap that goes unnoticed: `VulkanRenderPass`
+/// sat on a "dead code, skip it" list though it was the only path that worked on
+/// a 1.0 device.
 #[test]
 fn the_backend_file_map_is_accounted_for() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    // The C++ tree is a sibling checkout. Walk up rather than assume a depth:
-    // this crate has moved twice, and a depth-sensitive path that resolves to
-    // nothing makes a test skip while reporting success.
+    // The sibling tree can sit at any depth. Walk up rather than assume one: a
+    // depth-sensitive path that resolves to nothing makes the test skip while
+    // reporting success.
     let Some(cpp) = find_upwards(root, "UHE/src/Platform/Vulkan") else {
         eprintln!("skipping: the C++ tree is not present");
         return;
@@ -219,9 +206,8 @@ fn the_backend_file_map_is_accounted_for() {
         })
         .collect();
 
-    // Every C++ class we deliberately skip, and why. A new entry here is a
-    // decision, not a convenience, which is why it is a list rather than a
-    // pattern.
+    // Every class deliberately skipped, and why. A new entry is a decision,
+    // which is why it is a list rather than a pattern.
     let skipped: &[(&str, &str)] = &[
         (
             "VulkanBinaryFence",
@@ -264,8 +250,8 @@ fn the_backend_file_map_is_accounted_for() {
     );
 }
 
-/// Find `relative` in any ancestor. Depth-sensitive paths are the single most
-/// expensive recurring bug in this repository's test suite.
+/// Find `relative` in any ancestor. Depth-sensitive paths have caused repeated
+/// test failures in this repository.
 fn find_upwards(from: &std::path::Path, relative: &str) -> Option<std::path::PathBuf> {
     for ancestor in from.ancestors() {
         let candidate = ancestor.join(relative);

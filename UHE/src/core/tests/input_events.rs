@@ -1,10 +1,8 @@
-//! The event bus is what fills input state, and the frame is where it happens.
+//! The event bus fills input state, and the frame is where it happens.
 //!
-//! This is the seam the C++ tree did not have: `WindowInput` polled the window
-//! and the ImGui layer polled it again, so the two could disagree about what was
-//! down. Here the window pushes events, the engine owns one `Input`, and the
-//! frame drains the bus into it — so a key that arrived this frame is held for
-//! this frame and no other copy of that state exists.
+//! The window pushes events, the engine owns one `Input`, and the frame drains
+//! the bus into it: a key that arrived this frame is held for this frame, and
+//! no other copy of that state exists.
 
 use adam::{App, Engine};
 use pings::{Event, KeyCode, MouseButton};

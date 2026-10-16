@@ -1,9 +1,8 @@
 //! Base engine. Owns the composition root and nothing else.
 //!
-//! The one structural rule this crate enforces: **plugins hold behavior,
-//! `Engine` holds data**. A plugin owns its own private state and receives
-//! `&mut Engine` per hook, so `adam` never depends on a plugin crate and a
-//! plugin never reaches into another plugin's state.
+//! The structural rule: plugins hold behavior, `Engine` holds data. A plugin
+//! owns its state and gets `&mut Engine` per hook, so `adam` depends on no
+//! plugin crate and no plugin reaches into another's state.
 
 pub mod app;
 pub mod backend;

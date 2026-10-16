@@ -1,13 +1,10 @@
 //! The substitutable backends the engine owns as trait objects.
 //!
-//! The traits live here, in `adam`, and not in `femur` or `wire`, for the same
-//! reason `chassis::Gpu` lives in the RHI: the engine names an interface and a
-//! plugin supplies one implementation, so `adam` has no dependency on rapier or
-//! rodio and a build with no physics still compiles.
+//! They live in `adam`, not `femur` or `wire`: the engine names an interface
+//! and a plugin supplies one implementation, so a build with no physics still
+//! compiles.
 //!
-//! `Send` because a backend is owned by a plugin, and plugins are `Send` — the
-//! engine may be moved between threads, and a backend that quietly cannot be is
-//! a crash waiting for the first person who does it.
+//! `Send`, because plugins are `Send` and the engine may move between threads.
 
 use glam::Vec3;
 use meats::Scene;
@@ -45,9 +42,8 @@ impl Default for Listener {
 
 /// Rigid-body simulation.
 ///
-/// One method, because everything else is a question about the scene: bodies,
-/// colliders and transforms are `meats` components, and a backend's job is to
-/// bring the simulation in line with them and write the result back.
+/// One method: bodies, colliders and transforms are `meats` components, and a
+/// backend brings the simulation in line with them and writes the result back.
 pub trait PhysicsBackend: Send {
     fn name(&self) -> &'static str;
 
@@ -70,8 +66,6 @@ pub trait AudioBackend: Send {
     ///
     /// Takes `Assets` because a clip is a handle and the bytes live in the
     /// registry: without it a backend can name a sound and never decode one.
-    /// The alternative — a shared table the plugin fills in and the backend
-    /// reads — is the second-owner pattern the spine exists to remove.
     fn update(&mut self, scene: &Scene, assets: &vault::Assets, dt: f32);
 
     fn play(&mut self, assets: &vault::Assets, clip: vault::AssetId, gain: f32) -> Option<VoiceId>;
