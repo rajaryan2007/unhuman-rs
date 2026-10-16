@@ -1,10 +1,9 @@
 [package]
 name = "pings"
-description = "Events and messages. Two separate mechanisms."
+description = "Events: the bus, the key and mouse codes, the event enum"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }

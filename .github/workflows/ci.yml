@@ -15,12 +15,16 @@ name: CI
 # When Windows gets a real backend test, it needs a driver the runner can see.
 # That is the job to add then, not a row to widen now.
 #
-# Four jobs, and the split is not cosmetic.
+# Six jobs, and the split is not cosmetic.
 #
-# `logic` needs no GPU at all and runs everywhere. `vulkan` runs the backend
-# against Mesa's **lavapipe**, a software Vulkan implementation, with the
-# Khronos validation layer loaded. That is not a mock: it is the same driver
-# interface, the same validation layer and the same validation rules, on a CPU.
+# `logic` needs no GPU at all and runs everywhere, as does `smoke`, which asks
+# the build questions a first `cargo build` would surface. `parity` checks the
+# port's own claim -- every C++ file has a Rust counterpart or a recorded reason
+# it does not -- and is the one job that checks out a second repository. `vulkan`
+# runs the backend against Mesa's **lavapipe**, a software Vulkan implementation,
+# with the Khronos validation layer loaded. That is not a mock: it is the same
+# driver interface, the same validation layer and the same validation rules, on a
+# CPU.
 #
 # Without lavapipe the backend suite would only ever run on someone's machine,
 # which is how nine real bugs survived for the length of this project. A gate that
@@ -32,7 +36,9 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Linux, and only Linux. See the note at the top.
+# One shell for every job, so the Linux and Windows runs of the same command
+# behave the same. The one Windows step that is a PowerShell script asks for
+# `pwsh` itself.
 defaults:
   run:
     shell: bash
@@ -62,6 +68,22 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install system libraries
+        # The `audio` crate binds ALSA through `alsa-sys`, whose build script
+        # probes `alsa` with pkg-config. The runner has the runtime library but
+        # not the `-dev` headers, so the probe fails and the build stops.
+        #
+        # The editor's window needs libxkbcommon: `gpui_linux` declares
+        # `#[link(name = "xkbcommon")]` and `#[link(name = "xkbcommon-x11")]`,
+        # and the `-dev` packages are what put the `.so` symlinks the linker
+        # looks for on the runner.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev
+
       - name: Formatting
         run: cargo fmt --all --check
 
@@ -69,13 +91,59 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Tests that need no driver
-        run: cargo test -p grind -p chassis -p adam -p forge
+        run: cargo test -p grind -p chassis -p forge
 
       # Cheap and worth it: the workspace must resolve without cmake, a Vulkan
       # SDK or a driver, which is the property that lets a contributor clone and
       # run the tests on a laptop.
       - name: Workspace builds with no Vulkan SDK
         run: cargo build --workspace --all-targets
+
+  smoke:
+    name: smoke (build shapes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Same ALSA and xkbcommon headers as `logic`: `build_smoke` builds the
+      # whole workspace, editor included.
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev
+
+      # `adam` is where the build questions live: its `build_smoke` suite runs the
+      # workspace with all targets, in release, `--locked`, and the doc tests, and
+      # asserts the member list. A build question asked by a test is still a build
+      # question, and this is the job that asks them. It is separate from `logic`
+      # so a red run names the failure -- a compile shape, not a behaviour.
+      - name: Build questions
+        run: cargo test -p adam
+
+  parity:
+    name: parity (C++ coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The repository's claim is that nothing was left behind in the rewrite, and
+      # a claim like that is worth exactly as much as the check behind it -- which
+      # needs the tree it checks against. Cloned as a sibling, the layout
+      # `scripts/parity.sh` defaults to, so the default path itself is exercised.
+      # Shallow: the walk reads the working tree, and no submodule is under it.
+      - name: Check out the C++ tree alongside
+        run: git clone --depth 1 https://github.com/unhuman-engine/UNHUMAN.git ../UNHUMAN
+
+      - name: Every C++ file is ported, or has a recorded reason
+        run: ./scripts/parity.sh
 
   vulkan:
     name: vulkan (lavapipe + validation)
@@ -94,25 +162,49 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            libasound2-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             mesa-vulkan-drivers \
             vulkan-tools \
             libvulkan1 \
             spirv-tools
-          # Prove the software driver is actually there. A silent no-op here
+          # Prove the software driver is actually there, and find it rather than
+          # guess its name: Mesa 25.2.8 (noble-updates) ships `lvp_icd.json`,
+          # the older release ships `lvp_icd.x86_64.json`. A silent no-op here
           # produces a job that "passes" having tested nothing, which is the
           # exact failure this project already had once.
-          ls /usr/share/vulkan/icd.d/lvp_icd.*.json
+          icd=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -1)
+          if [ -z "$icd" ]; then
+            echo "::error::No lavapipe ICD under /usr/share/vulkan/icd.d"
+            ls -la /usr/share/vulkan/icd.d
+            exit 1
+          fi
+          echo "lavapipe ICD: $icd"
+          echo "VK_ICD_FILENAMES=$icd" >> "$GITHUB_ENV"
 
       - name: Show the device lavapipe reports
-        env:
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
         run: vulkaninfo --summary
+
+      # The shader-dependent backend tests compile `.slang` through `slangc`, and
+      # `forge` tries `SLANGC` first. The C++ tree vendored this exact version
+      # (2026.11) but this repository does not, and a shader test with no compiler
+      # panics rather than skipping -- deliberately: a skip reports success, which
+      # is the failure this repository already paid for once. Pinned, so the
+      # SPIR-V the tests compile is the same bytes every run.
+      - name: Install the Slang compiler
+        run: |
+          curl -sSL -o slang.tar.gz \
+            https://github.com/shader-slang/slang/releases/download/v2026.11/slang-2026.11-linux-x86_64.tar.gz
+          mkdir -p "$RUNNER_TEMP/slang"
+          tar xzf slang.tar.gz -C "$RUNNER_TEMP/slang"
+          echo "SLANGC=$RUNNER_TEMP/slang/bin/slangc" >> "$GITHUB_ENV"
 
       - name: Full gate
         env:
-          # lavapipe, not whatever the runner happens to have. A GPU on a
-          # shared runner is not reproducible; a software rasterizer is.
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          # `VK_ICD_FILENAMES` comes from the install step: lavapipe, not
+          # whatever the runner happens to have. A GPU on a shared runner is
+          # not reproducible; a software rasterizer is.
           UHE_VALIDATION: "1"
           # Serial. The suites share one device and one scratch directory, and
           # under load in CI they collide.
@@ -121,7 +213,6 @@ jobs:
 
       - name: Validation errors must be zero
         env:
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
           UHE_VALIDATION: "1"
         run: |
           # Printed as an artefact on failure. A validation error names a VUID
@@ -129,7 +220,10 @@ jobs:
           # unactionable.
           cargo test --workspace -- --test-threads=1 --nocapture 2>&1 \
             | tee validation.log
-          count=$(grep -c "Validation Error" validation.log || true)
+          # The Khronos layer's format, not any line containing the words. wgpu
+          # prints its own "Validation Error" from a deliberately corrupt-shader
+          # test (`stormglass`), and that is not a Vulkan validation error.
+          count=$(grep -cE 'Validation Error: \[' validation.log || true)
           echo "validation errors: $count"
           if [ "$count" != "0" ]; then
             echo "::error::Validation reported $count error(s). See the log."
@@ -173,7 +267,11 @@ jobs:
       # rather than fail here, which is the honest outcome: this job is about
       # the platform, not the driver.
       - name: Logic tests
-        run: .\scripts\gate.ps1 --no-vulkan
+        # `gate.ps1` is PowerShell, so it needs `pwsh` (the default bash would
+        # mangle the path) and PowerShell switch syntax: `-NoVulkan`, not
+        # `--no-vulkan`, which PowerShell reads as a positional argument.
+        shell: pwsh
+        run: .\scripts\gate.ps1 -NoVulkan
 
   shaders:
     name: shaders (regenerate and diff)
@@ -186,6 +284,15 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # See the note in the `vulkan` job. `compile.sh` reads `SLANGC`.
+      - name: Install the Slang compiler
+        run: |
+          curl -sSL -o slang.tar.gz \
+            https://github.com/shader-slang/slang/releases/download/v2026.11/slang-2026.11-linux-x86_64.tar.gz
+          mkdir -p "$RUNNER_TEMP/slang"
+          tar xzf slang.tar.gz -C "$RUNNER_TEMP/slang"
+          echo "SLANGC=$RUNNER_TEMP/slang/bin/slangc" >> "$GITHUB_ENV"
+
       # The checked-in .spv files are what the test suite actually loads, and
       # they are generated by a compiler nobody re-runs by hand. A shader edit
       # that forgets to regenerate leaves the suite testing the old bytes and
@@ -196,12 +303,6 @@ jobs:
       # this step was written.
       - name: Fail if the checked-in SPIR-V is stale
         run: |
-          SLANGC=$PWD/../unhuman/UHE/vendor/bin/linux/slang/bin/slangc
-          if [ ! -x "$SLANGC" ]; then
-            echo "::notice::The C++ tree is not present, so the vendored Slang"
-            echo "::notice::cannot be run. Skipping the staleness check."
-            exit 0
-          fi
           assets/shaders/compile.sh
           if ! git diff --quiet -- assets/shaders; then
             echo "::error::The checked-in SPIR-V does not match its .slang source."

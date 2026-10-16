@@ -1,146 +1,358 @@
-//! The façade: a listener, a mixer, a voice table and a device.
+//! The audio engine, and the plugin that installs it.
 //!
-//! ## The façade rule
-//!
-//! This is the only type in `wire` holding more than one noun, and that is
-//! deliberate rather than convenient — everything else is separately testable,
-//! and the thing that binds them is the thing whose whole job is binding them.
-//!
-//! ## Why not a static entry point
-//!
-//! Because that is what the C++ has, and it is why the C++ cannot be tested.
-//! `AudioEngine` is four `static` functions forwarding to `MiniAudioBackend`'s
-//! file-scope `static ma_engine` and `static std::vector<ma_sound*>`. Nothing
-//! can be constructed in isolation, nothing can be two-at-once, and every test
-//! needs an audio device — so upstream's audio has no tests, and having no tests
-//! is why its largest defect went unnoticed for the life of the project. This
-//! takes its device as a constructor argument, so [`AudioEngine::headless`] is
-//! an ordinary engine with an ordinary lifetime and CI can run it.
+//! The C++ split this in two: `AudioEngine` was a facade of statics that forwarded
+//! to `MiniAudioBackend`, which owned the device in file-scope globals
+//! (`s_AudioEngine`, `s_ActiveSounds`) — so nothing but `Application` could ever
+//! have an audio engine, and nothing could be tested without a device. Here one
+//! owner holds the voices and the clip table, the device is an `Option`, and the
+//! bookkeeping runs with the `Option` empty.
 
-use crate::bus::Bus;
-use crate::device::AudioDevice;
-use crate::error::Result;
-use crate::headless::HeadlessDevice;
-use crate::listener::Listener;
-use crate::mixer::Mixer;
-use crate::rodio_device::RodioDevice;
-use crate::voice_table::SlotTable;
+use glam::Vec3;
 
-/// The engine.
+use adam::{AudioBackend, Engine, FrameCtx, Listener, Plugin, Result, VoiceId};
+use meats::hecs;
+use meats::{AudioSource, Scene};
+use vault::{AssetId, Assets};
+
+use crate::backend::Backend;
+use crate::sound::{Bus, SoundId, SoundTable};
+use crate::spatial::{attenuation, pan};
+use crate::voice::{VoicePool, VoiceSpec};
+
+/// Voices an engine runs at once when nothing asks for another number.
+pub const DEFAULT_VOICES: usize = 64;
+
+/// Playback: the voice table, the clips, and the device if there is one.
 ///
-/// ## The frame loop
-///
-/// Three calls, once per frame, in this order:
-/// [`Self::set_listener`] with the camera's transform, whatever the game wants
-/// to play or change, then [`Self::update`] with the frame time.
-///
-/// ## Not thread-safe by contract
-///
-/// Every method takes `&mut self` except [`Self::device`], [`Self::listener`]
-/// and [`Self::mixer`]. An engine can be moved to a dedicated audio thread —
-/// [`AudioDevice`] is `Send` — but two threads cannot drive it at once without
-/// the owner synchronising. That is the direct fix for the C++'s unsynchronised
-/// `s_ActiveSounds`, and it is a contract rather than an enforcement: nothing
-/// stops a caller wrapping an engine in a `Mutex` and doing something
-/// incoherent, and pretending otherwise would be worse than saying it.
+/// With no output device this is a silent engine: it answers every call, counts no
+/// voices and plays nothing. That is what makes registering it safe on a build
+/// machine, and it is the only reason `WirePlugin::build` cannot fail.
 pub struct AudioEngine {
-    pub(crate) listener: Listener,
-    pub(crate) mixer: Mixer,
-    pub(crate) device: Box<dyn AudioDevice>,
-    pub(crate) voices: SlotTable,
-    pub(crate) frames: u64,
+    listener: Listener,
+    master_gain: f32,
+    bus_gains: [f32; Bus::COUNT],
+    pool: VoicePool,
+    sounds: SoundTable,
+    device: Option<Backend>,
 }
 
 impl AudioEngine {
-    /// An engine over an already-built device.
-    ///
-    /// Use this to supply a device of your own, or [`Self::headless`].
-    pub fn new(device: Box<dyn AudioDevice>) -> Self {
-        AudioEngine {
-            listener: Listener::new(),
-            mixer: Mixer::new(),
-            device,
-            voices: SlotTable::new(),
-            frames: 0,
+    /// Open the default output device; silent if there is none.
+    pub fn new() -> Self {
+        Self::with_capacity(DEFAULT_VOICES)
+    }
+
+    /// As [`AudioEngine::new`], with a cap on simultaneous voices. A capacity of
+    /// zero refuses every voice, which is a valid way to switch audio off.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            listener: Listener::default(),
+            master_gain: 1.0,
+            bus_gains: [1.0; Bus::COUNT],
+            pool: VoicePool::new(capacity),
+            sounds: SoundTable::new(),
+            device: Backend::open(),
         }
     }
 
-    /// An engine with no audio hardware at all.
-    ///
-    /// **Not a mock.** The same code runs: the listener, the attenuation, the
-    /// panning, the bus arithmetic and the voice lifecycle all execute, and
-    /// every value they produce is readable through the [`HeadlessDevice`]. This
-    /// is what makes the crate's tests run in CI, and what makes a headless
-    /// game server possible.
-    pub fn headless() -> Self {
-        AudioEngine::new(Box::new(HeadlessDevice::new()))
+    /// True when there was no output device to open.
+    pub fn is_silent(&self) -> bool {
+        self.device.is_none()
     }
 
-    /// An engine over a real rodio sink, or [`crate::Error::NoDevice`].
-    ///
-    /// Falling back to [`Self::headless`] on failure is reasonable for a game
-    /// and terrible for a test, which is why this reports the error instead of
-    /// swallowing it.
-    pub fn new_on_default_device() -> Result<Self> {
-        Ok(AudioEngine::new(Box::new(RodioDevice::open_default()?)))
+    pub fn listener(&self) -> Listener {
+        self.listener
     }
 
-    /// The device, for inspection.
-    ///
-    /// Also how a caller reaches [`Self::device_spec`], [`Self::live_count`] and
-    /// whatever else the device reports. Nothing should *do* anything with it:
-    /// reaching through an engine to its device is how a second, divergent copy
-    /// of the mix appears.
-    pub fn device(&self) -> &dyn AudioDevice {
-        self.device.as_ref()
+    pub fn set_listener(&mut self, listener: Listener) {
+        self.listener = listener;
     }
 
-    /// The listener, for reading where the ears are.
-    pub fn listener(&self) -> &Listener {
-        &self.listener
+    /// Voices playing right now. Zero in silent mode, because nothing was started.
+    pub fn active_voices(&self) -> usize {
+        self.pool.len()
     }
 
-    /// The mixer, for reading bus gains and the master.
-    pub fn mixer(&self) -> &Mixer {
-        &self.mixer
+    pub fn bus_gain(&self, bus: Bus) -> f32 {
+        self.bus_gains[bus.slot()]
     }
 
-    /// The mixer, for moving faders.
-    pub fn mixer_mut(&mut self) -> &mut Mixer {
-        &mut self.mixer
+    pub fn set_bus_gain(&mut self, bus: Bus, gain: f32) {
+        self.bus_gains[bus.slot()] = gain;
     }
 
-    /// How many frames [`Self::update`] has run.
-    pub fn frame_count(&self) -> u64 {
-        self.frames
+    /// The clip id for an asset, registering it the first time `vault` has its
+    /// bytes. `None` while the load is in flight.
+    pub fn register(&mut self, assets: &Assets, asset: AssetId) -> Option<SoundId> {
+        self.sounds.resolve(assets, asset)
     }
 
-    /// How many sounds are playing.
-    pub fn live_count(&self) -> usize {
-        self.voices.live()
+    /// Play a clip from nowhere in particular: the C++ `PlaySound2D(filepath, volume, loop)`.
+    pub fn play_2d(
+        &mut self,
+        assets: &Assets,
+        clip: AssetId,
+        gain: f32,
+        looping: bool,
+    ) -> Option<VoiceId> {
+        let sound = self.register(assets, clip)?;
+        self.play_sound(
+            sound,
+            VoiceSpec {
+                gain,
+                looping,
+                ..VoiceSpec::default()
+            },
+        )
     }
 
-    /// Move and turn the listener. Call once per frame with the camera.
-    ///
-    /// The replacement for the C++'s `SetListenerPosition(position, forward,
-    /// up)` (`AudioEngine.h:22`): same three arguments, same per-frame cadence,
-    /// and it now feeds arithmetic that can be asserted on with no device
-    /// present.
-    ///
-    /// A degenerate transform produces an arbitrary frame rather than a `NaN`
-    /// one; see [`Listener`] for why that is the failure mode worth designing
-    /// away.
-    pub fn set_listener(&mut self, position: glam::Vec3, forward: glam::Vec3, up: glam::Vec3) {
-        self.listener.set_listener(position, forward, up);
+    /// Play a clip at a world position: the C++ `PlaySound3D(filepath, position, volume, loop)`,
+    /// which spatialised through miniaudio's engine and never knew the listener.
+    pub fn play_3d(
+        &mut self,
+        assets: &Assets,
+        clip: AssetId,
+        position: Vec3,
+        gain: f32,
+        looping: bool,
+        range: f32,
+    ) -> Option<VoiceId> {
+        let sound = self.register(assets, clip)?;
+        self.play_sound(
+            sound,
+            VoiceSpec {
+                gain,
+                looping,
+                spatial: true,
+                range,
+                position,
+                ..VoiceSpec::default()
+            },
+        )
     }
 
-    /// The master fader. `0.0` is silence, and is the mute.
-    pub fn set_master_volume(&mut self, volume: f32) {
-        self.mixer.set_volume(Bus::Master, volume);
+    /// Start an already-registered clip. `None` when the device refused it or the
+    /// pool had no room.
+    pub fn play_sound(&mut self, sound: SoundId, spec: VoiceSpec) -> Option<VoiceId> {
+        self.device.as_ref()?;
+        let id = self.pool.spawn(None, sound, spec)?;
+        if self.start_player(id) {
+            Some(id)
+        } else {
+            self.pool.remove(id);
+            None
+        }
     }
 
-    /// A bus's own fader, before the master.
-    pub fn set_bus_volume(&mut self, bus: Bus, volume: f32) {
-        self.mixer.set_volume(bus, volume);
+    /// Stop a voice now, whether the scene started it or a direct play did.
+    pub fn stop(&mut self, voice: VoiceId) -> bool {
+        if let Some(backend) = self.device.as_mut() {
+            backend.stop(voice);
+        }
+        self.pool.remove(voice)
     }
+
+    /// One frame: the voices are brought in line with the scene's playing sources,
+    /// then the device is driven to match. A no-op with no device.
+    pub fn update(&mut self, scene: &Scene, assets: &Assets) {
+        if self.device.is_none() {
+            return;
+        }
+        self.reconcile(scene, assets);
+        self.drive();
+    }
+
+    /// Start the player of a voice that has none, failing when its clip cannot be
+    /// decoded.
+    fn start_player(&mut self, id: VoiceId) -> bool {
+        let Some(voice) = self.pool.get(id) else {
+            return false;
+        };
+        let Some(sound) = self.sounds.get(voice.sound) else {
+            return false;
+        };
+        let Some(backend) = self.device.as_mut() else {
+            return false;
+        };
+        backend.start(voice, sound)
+    }
+
+    /// Bring the voice pool in line with the scene: a source that started playing
+    /// gets a voice at its entity's world position, a source that stopped loses it,
+    /// and a running voice picks up whatever the component now says.
+    fn reconcile(&mut self, scene: &Scene, assets: &Assets) {
+        let world = scene.world();
+        let mut query = world.query::<(hecs::Entity, &AudioSource)>();
+        let sources = query.iter().filter_map(|(hecs_entity, source)| {
+            let entity = scene.entity_of(hecs_entity)?;
+            let position = scene.world_transform(entity).w_axis.truncate();
+            Some((entity, source, position))
+        });
+
+        let pool = &mut self.pool;
+        let sounds = &mut self.sounds;
+        pool.reconcile(sources, |source| match source.clip {
+            Some(clip) => sounds.resolve(assets, clip),
+            None => None,
+        });
+    }
+
+    /// Bring the device in line with the pool: start what has no player yet, apply
+    /// gain, pitch and pan, and reap what has finished.
+    fn drive(&mut self) {
+        let listener = self.listener;
+        let master = self.master_gain;
+        let buses = self.bus_gains;
+
+        // Voices the scene added this frame have no player yet.
+        let pending: Vec<VoiceId> = match &self.device {
+            Some(backend) => self
+                .pool
+                .voices()
+                .iter()
+                .filter(|voice| !backend.has(voice.id))
+                .map(|voice| voice.id)
+                .collect(),
+            None => return,
+        };
+        for id in pending {
+            // A clip that cannot be decoded is dropped rather than retried, and
+            // logged, every frame.
+            if !self.start_player(id) {
+                self.pool.remove(id);
+            }
+        }
+
+        let Some(backend) = self.device.as_mut() else {
+            return;
+        };
+
+        for id in backend.finished() {
+            backend.stop(id);
+            self.pool.remove(id);
+        }
+
+        for voice in self.pool.voices() {
+            let distance = (voice.spec.position - listener.position).length();
+            if voice.spec.spatial {
+                voice.pan.set_pan(pan(&listener, voice.spec.position));
+            } else {
+                voice.pan.set_gains(1.0, 1.0);
+            }
+            let falloff = if voice.spec.spatial {
+                attenuation(distance, voice.spec.range)
+            } else {
+                1.0
+            };
+            let volume = voice.spec.gain * falloff * buses[voice.spec.bus.slot()] * master;
+            backend.set_gain(voice.id, volume, voice.spec.pitch);
+        }
+    }
+}
+
+impl Default for AudioEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AudioBackend for AudioEngine {
+    fn name(&self) -> &'static str {
+        "wire"
+    }
+
+    fn listener(&self) -> Listener {
+        self.listener
+    }
+
+    fn set_listener(&mut self, listener: Listener) {
+        self.listener = listener;
+    }
+
+    /// `dt` is unused: rodio's clock is the device's, and the mixer has already been
+    /// playing for however long the frame took.
+    fn update(&mut self, scene: &Scene, assets: &Assets, _dt: f32) {
+        AudioEngine::update(self, scene, assets);
+    }
+
+    fn play(&mut self, assets: &Assets, clip: AssetId, gain: f32) -> Option<VoiceId> {
+        self.play_2d(assets, clip, gain, false)
+    }
+
+    fn stop(&mut self, voice: VoiceId) {
+        AudioEngine::stop(self, voice);
+    }
+
+    fn active_voices(&self) -> usize {
+        self.pool.len()
+    }
+
+    fn master_gain(&self) -> f32 {
+        self.master_gain
+    }
+
+    fn set_master_gain(&mut self, gain: f32) {
+        self.master_gain = gain;
+    }
+}
+
+/// Installs [`AudioEngine`] into `Engine::audio` and drives it once a frame.
+pub struct WirePlugin {
+    capacity: usize,
+}
+
+impl WirePlugin {
+    pub fn new() -> Self {
+        Self {
+            capacity: DEFAULT_VOICES,
+        }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self { capacity }
+    }
+}
+
+impl Default for WirePlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Plugin for WirePlugin {
+    fn name(&self) -> &'static str {
+        "wire"
+    }
+
+    fn build(&mut self, eng: &mut Engine) -> Result<()> {
+        eng.audio = Some(Box::new(AudioEngine::with_capacity(self.capacity)));
+        Ok(())
+    }
+
+    /// Once a frame, not once per fixed step: the listener follows the camera, which
+    /// moves per frame, and a frame whose accumulator reached no step runs no
+    /// substeps at all. The C++ called `AudioEngine::Update()` from the frame loop
+    /// for the same reason.
+    fn on_frame(&mut self, eng: &mut Engine, _ctx: &mut FrameCtx) {
+        let Some(audio) = eng.audio.as_mut() else {
+            return;
+        };
+        audio.set_listener(listener_from(&eng.scene));
+        audio.update(&eng.scene, &eng.assets, 0.0);
+    }
+}
+
+/// The primary camera's pose as the ear — what the C++ game layer did every frame
+/// with `SetListenerPosition(camera.GetPosition(), forward, up)`.
+pub fn listener_from(scene: &Scene) -> Listener {
+    let Some(camera) = scene.primary_camera() else {
+        return Listener::default();
+    };
+    let transform = scene.world_transform(camera);
+    Listener::new(
+        transform.w_axis.truncate(),
+        // Right-handed: a camera looks down its own -Z.
+        -transform.z_axis.truncate(),
+        transform.y_axis.truncate(),
+    )
 }

@@ -7,25 +7,32 @@ use crate::plugin::{FrameCtx, Plugin};
 /// are separate fields of the same struct precisely so that iterating plugins
 /// and handing each one `&mut self.engine` are two disjoint borrows rather than
 /// an aliasing problem.
+///
+/// Declaration order is drop order, and here it is load-bearing: **plugins drop
+/// before the engine**, so a renderer's pipelines, buffers and bind groups are
+/// destroyed while the device that created them is still alive. The other order
+/// compiles, reports no error, and leaks every resource the renderer owns —
+/// which is exactly what the Vulkan backend did before its device was moved
+/// first in its own struct.
 pub struct App {
-    engine: Engine,
     plugins: Vec<Box<dyn Plugin>>,
+    engine: Engine,
     running: bool,
 }
 
 impl App {
     pub fn new() -> Self {
         Self {
-            engine: Engine::new(),
             plugins: Vec::new(),
+            engine: Engine::new(),
             running: true,
         }
     }
 
     pub fn with_engine(engine: Engine) -> Self {
         Self {
-            engine,
             plugins: Vec::new(),
+            engine,
             running: true,
         }
     }
@@ -88,10 +95,20 @@ impl App {
             quit: false,
         };
 
+        // Input state is owned by the engine and fed from the event bus, one
+        // consumer, one source of truth. The window layer pushes events; it does
+        // not keep a second copy of the held/pressed state, which is how the C++
+        // ended up with `WindowInput` disagreeing with the ImGui layer.
+        self.engine.input.begin_frame();
+        for event in self.engine.events.drain() {
+            self.engine.input.apply(&event);
+        }
+
         // Fixed-step substeps first, so rendering always sees a settled
         // simulation state regardless of frame rate.
         while let Some(step) = self.engine.time.consume_fixed_step() {
             ctx.step = step;
+            self.engine.simulate_fixed_step(step);
             for plugin in &mut self.plugins {
                 plugin.on_update(&mut self.engine, &mut ctx);
             }
@@ -107,6 +124,12 @@ impl App {
         // time rather than a binding held across the loop, because the hook
         // needs `&mut self.engine` as a whole and pulls the GPU out of it
         // itself.
+        //
+        // The order is the frame's contract with a backend: acquire, let every
+        // plugin record (a renderer hands its compiled frame to
+        // `Gpu::record_frame`), then `submit`, which is the one place a frame is
+        // presented. A plugin must not present, and `record_frame` must not —
+        // two present sites is a frame presented twice.
         if self.engine.gpu.is_some() {
             if let Some(gpu) = self.engine.gpu.as_mut() {
                 gpu.frame_begin()?;
@@ -122,6 +145,8 @@ impl App {
         if ctx.quit {
             self.running = false;
         }
+
+        self.engine.input.end_frame();
         Ok(())
     }
 

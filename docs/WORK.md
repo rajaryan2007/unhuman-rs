@@ -47,14 +47,20 @@ because bash on a Windows runner is a Git Bash layer with its own path rules and
 gate that behaves differently on the platform it is meant to check is worse than
 no gate.
 
-Five jobs:
+Six jobs:
 
 - **logic** — no GPU needed. fmt, clippy, and the suites that never touch a
-  driver: `grind`, `chassis`, `adam`, `forge`.
-- **smoke** — build questions, not behaviour: workspace with all targets, in
-  release, `--locked`, doc tests, and a check that every C++ class has a Rust
-  counterpart *or a recorded reason it does not*. That last one is why
-  `VulkanRenderPass` is no longer on a "dead code, skip it" list.
+  driver: `grind`, `chassis`, `forge`.
+- **smoke** — build questions, not behaviour: `adam`'s `build_smoke` suite builds
+  the workspace with all targets, in release and `--locked`, runs the doc tests,
+  and checks the member list. A job of its own so a red run names the failure —
+  a compile shape, not a behaviour.
+- **parity** — the check behind this repository's claim that nothing was left
+  behind in the rewrite: `scripts/parity.sh` against a fresh, shallow clone of
+  the C++ tree (`unhuman-engine/UNHUMAN`). Every C++ file must have a Rust
+  counterpart or a recorded reason it does not, so a file that quietly stops
+  being ported fails the build. That is why `VulkanRenderPass` is no longer on a
+  "dead code, skip it" list.
 - **vulkan** — the backend against Mesa's **lavapipe** with the validation layer
   loaded. Same driver interface, same validation rules, on a CPU. Without this
   the backend suite would only ever run on one machine, which is how nine real
@@ -62,6 +68,15 @@ Five jobs:
 - **shaders** — regenerates the checked-in SPIR-V and fails if it differs from
   the `.slang` source. A shader edit that forgets to regenerate leaves the suite
   testing the old bytes and still green.
+- **windows** — build, release, clippy, fmt and the driver-free suites, on
+  Windows. It runs what the platform can and says what it cannot: a GitHub
+  Windows runner has no Vulkan driver.
+
+`vulkan` and `shaders` download a pinned Slang (2026.11, the version the C++
+tree vendored) and point `SLANGC` at it. The shader-dependent backend tests
+compile `.slang` at run time and panic rather than skip when there is no
+compiler, so a job that cannot find one fails loudly instead of going green
+having tested nothing.
 
 Never push. Commit only; the owner pushes.
 
@@ -77,8 +92,20 @@ UHE/                        at the repository root, like the C++ tree
     core/                   adam: engine, app, the Plugin base
     rhi/                    chassis: the backend-neutral RHI, the seam
     jobs/                   grind: the job system
-    shaders/                forge: Slang in, SPIR-V out
-    renderer/               the renderer frontend, as a Plugin. Coming.
+    shaders/                forge: Slang and WGSL in, SPIR-V out
+    events/                 pings: the event bus, key and mouse codes
+    platform/               eyes: window and input, winit re-exported
+    scene/                  meats: ECS, components, hierarchy, .unhuman
+    assets/                 vault: registry, VFS, loaders
+    renderer/               bifrost: the renderer frontend, as a Plugin
+    audio/                  wire: audio, as a Plugin
+    physics/                femur: rigid bodies, as a Plugin
+    editor/                 mirror: the editor model, as a Plugin
+  bins/
+    nocap/                  headless: gpu: None, fixed steps, exits
+    sandbox/                windowed: wgpu, a real swapchain
+    editor/                 gpui over mirror's model, gpui pinned by rev
+  games/aimlab/             the UHEGAME demo layer, as a Plugin
   and chassis (UHE/src/rhi) now owns the *render graph*:
     chassis::graph          types, resources, builder, compiler, facade,
                            and `pass.rs` -- SlotTable, PassScope, PassRecorder,
@@ -177,24 +204,59 @@ frontend too.
       emit different SPIR-V across releases, and a key without it serves stale
       shaders after a toolchain bump.
 
-## Game side — none of this exists yet
+## The port: the game side
 
-0% of the 21,745-line C++ engine outside the backend.
+The 21,745-line C++ engine outside the backend now has a Rust counterpart, crate per
+subsystem, written against `docs/architecture/01-crate-map.md` — that file is the
+contract: the seams, the pinned shapes, the dependency direction, and everything
+deliberately not ported with its reason.
 
-- [ ] **8. `eyes`** — window + input. Needs `ash-window` + `winit`. Unblocks a
-      real window and therefore a real swapchain. **Both platforms**, so the
-      windowing layer is the first place platform differences become real rather
-      than theoretical -- and the Windows CI job exists partly so that code gets
-      compiled early enough for that to be cheap.
-- [ ] **9. `meats`** — ECS on hecs, hierarchy, scene serialisation (2,943 C++
-      lines).
-- [ ] **10. `bifrost`** — renderer frontend: passes, camera, material, mesh.
-- [ ] **11. First triangle on screen.** Requires 8, 9, 10 and a shader.
-- [ ] **12. `vault`** — asset registry with generational handles. The C++ is
-      path-based with no registry (`IDEA.md:61`).
-- [ ] **13. `femur`, `wire`, `mirror`, `pings`** — physics, audio, UI, events.
+| crate | C++ it replaces | what it is |
+|---|---|---|
+| `pings` | `Events/*`, `Core/keyCodes.h`, `mouseButtonCodes.h` | the event bus, the key table, one `Event` enum |
+| `eyes` | `Platform/Windows/*`, `Core/Window.h` | winit 0.30 behind one `run_windowed(desc, frame)` |
+| `meats` | `Scene/*` | hecs ECS, components, hierarchy, `.unhuman` YAML |
+| `vault` | `AssestsManager/*`, `KTX2`, the CPU half of `LoadModel*` | registry with generational handles, VFS, loaders |
+| `bifrost` | `Renderer3D/*`, `Renderer/*`, `MaterialGPU`, `LightSystem`, `SSAO` | passes, cameras, mesh and material caches, text and the 2D batch, animation, IK |
+| `wire` | `Audio/*` | rodio behind `adam::AudioBackend`, voices, attenuation |
+| `femur` | `Physics/PhysicsSystem3D` | rapier3d behind `adam::PhysicsBackend` |
+| `mirror` | `UHE_EDITOR/*`, `ImGui/*` | the editor model: hierarchy, inspector, content browser, gizmos, play state, undo |
 
-## Dead or skipped, deliberately
+`adam::Engine` grew the fields those need (`events`, `input`, `scene`, `assets`,
+`physics`, `audio`) and `App::frame` now owns the frame's shape: input is fed from the
+event bus, fixed steps run `simulate_fixed_step` before the hooks, and plugins drop
+before the engine so a renderer's GPU resources outlive nothing.
+
+Status, stated the way this file states everything else: **the port has not been
+compiled.** It was written on a machine with no compiler available, so every claim above
+is a claim about files that exist and seams that are documented, not about a green run.
+The next step is `cargo build --workspace`, then `./scripts/gate.sh`.
+
+What *is* checked, mechanically, is coverage: `scripts/parity.sh` maps all 232 C++ files
+under `UHE/src/UHE`, `UHE/src/Platform`, `UHE_EDITOR/src` and `UHEGAME/src` to either the
+Rust file that holds the port or a one-line reason it was not ported — 193 moved, 39
+skipped, 0 unaccounted. It fails on a C++ file with no entry and on a table entry whose
+Rust target no longer exists, so a rename or a new C++ file breaks the check rather than
+the table. The reasons are the ones in this file and in
+`docs/architecture/01-crate-map.md`.
+
+## Gaps the port records rather than hides
+
+Each of these is a named refusal or a documented absence, not a silent no-op. They are
+what a first green build will still not do.
+
+| gap | what happens | what closes it |
+|---|---|---|
+| A Vulkan frame that draws the swapchain | `record_frame` refuses by name: a Vulkan swapchain image has no `chassis::Texture` handle, so the backbuffer slot cannot be bound | a non-owning `Textures` entry (`register_external`) plus binding it in `record_frame`, and an acquire in `VulkanGpu::frame_begin`, which today only resets the graph. `VulkanGpu::present` also transitions from `UNDEFINED`, which must stop once the graph's own epilogue leaves the image in `Present` |
+| The editor viewport | shows the theme background and a label saying why: the RHI has no readback, so the drawn image cannot reach a gpui panel, and there is nothing to overlay a gizmo on or pick against | an `Image`/readback path in `chassis`, or gpui owning the surface the frame is presented to. Viewport picking itself is implemented (`mirror::picking`, CPU ray against mesh bounds) and needs only the camera ray a viewport would supply |
+| `Gpu::graph()` / `RenderGraph::{add_pass, add_dependency}` | refused by name on both backends: a `RenderPassDesc` carries no resource states, and a pass declared from one would be ordered against states the caller never gave | deleting the dead trait surface, or growing `RenderPassDesc` to carry states. `bifrost` declares through `chassis::graph::RenderGraph`, which is the real path |
+| Per-frame uniforms and the per-draw arena | buffers are re-created (with their bind groups) every frame, and Vulkan's `destroy_bind_group` is a no-op, so the groups are not reclaimed (`shortcut:` in `passes/uniforms.rs`). **Under load this is a live bug on Vulkan**: `VulkanDescriptorManager` rebuilds its pool (and resets its set registry) when the pool fills or a new layout appears, so an earlier `BindGroup` goes stale and the next bind panics on a stale handle — a frame with more than ~64 draws reaches that. wgpu is unaffected | a `Resources::upload_buffer` for the update-in-place path, plus `DescriptorPool::reset` once per frame and/or freeing sets in `destroy_bind_group` |
+| Push constants | unusable: `PipelineDesc` has no push-constant range, `VulkanPipelineState` declares `&[]`, and wgpu's `CommandList::set_push_constants` is `unimplemented!()` — a panic, which nothing reaches because the renderer sends uniforms as buffers. The C++'s 192-byte block is a descriptor set here | a range in `PipelineDesc` and one lowering per backend |
+| Two passes the graph cannot express | the transparent draws share the opaque pass (sorted back-to-front, per-draw pipeline) and the grid/gizmo pass has no depth attachment. A clear pass can also be culled, because `LoadOp::Load` is not a read. `PassBuilder::depth_load` and the `PASS_TRANSPARENT` recorder slot have landed; **nothing declares the pass yet**, so the shares-the-opaque-pass half is still true | the split in `bifrost`'s frame construction, now that the builder can express it, and a cull rule for a pass whose only job is a clear or a dependency |
+| Mip chains, skinning, shadow-map sampling on wgpu | textures upload mip 0 (no GPU generate-mipmaps in either backend); nothing builds a bone palette from a loaded model into the vertex data yet; the depth descriptor kind that makes wgpu accept a depth view is `DescriptorKind::SampledDepth` (added, so both depth reads are describable) | backend mip generation, a `bifrost` skinning path, and nothing further for the depth kind |
+| Demo assets | `assets/models/{Sphere.glb,Box.gltf,Box0.bin}` and `assets/audio/gunshot.wav` ship; the 12 MB animated pistol does not, because no code path names it | port the pistol's animation path, or leave it out |
+
+
 
 Do not port. Each was measured, not assumed.
 
@@ -207,6 +269,12 @@ Do not port. Each was measured, not assumed.
 | `UI/VulkanImGui*.h` | **not skipped — relocated.** Referenced by `UHE/src/UHE/ImGui/ImGuiLayer.cpp`. They belong with the UI layer, not the backend. |
 | `UHE/Renderer2D/` | already `EXCLUDE`d from the C++ build (`UHE/CMakeLists.txt:12`) |
 | `Platform/Linux/` | vestigial; `Window::Create` always returns `WindowsWindow` |
+| `Platform/Windows/*` | winit replaces it, on both platforms, from one implementation |
+| `ImGui/*`, `UHE_EDITOR/*` | replaced, not dropped: the model is `mirror`, drawn by gpui in `UHE/bins/editor` |
+| `box2d` 2D physics | the 3D path is the product; 2D returns when a scene needs it, as a `femur` feature |
+| `vendor/basis_universal` | UASTC transcode needs a C++ toolchain at build time; the KTX2 container is parsed by hand and a supercompressed payload is refused by name |
+| msdf-atlas-gen **runtime** atlas generation | FreeType + msdfgen as a build-time C++ dependency. `vault`/`bifrost` rasterise a coverage atlas with `ab_glyph` and read a pre-baked MSDF atlas when one is present; the shader has both sampling modes |
+| `AudioEngine::s_ActiveSounds`, `WindowInput`'s second copy of input state | ambient statics; `Engine` owns audio state and input state, and nothing else does |
 | `UHE/Test/` | declarations with no bodies; `cargo test` replaces them |
 | Tracy macros | replaced by `VulkanScopes.rs` debug-utils labels |
 | global descriptor set | `VulkanCommandBuffer.cpp:370-375`, flagged at `docs/framegraph-and-rendergraph.md:57`; not carried over |
@@ -581,6 +649,21 @@ texture on wgpu, and may come from anything on Vulkan -- which checks layouts at
 barrier time instead. So "bind a render target as a texture by mistake" is a
 validation error on one backend and invisible on the other.
 
+### The third asymmetry: a sampled depth texture
+
+A depth texture bound as a `SampledImage` is legal on Vulkan and refused on wgpu.
+A depth view needs `TextureSampleType::Depth`, and wgpu checks the sample type of
+the view a bind group carries against the layout's -- so a `Float` binding holding
+the shadow map is a validation error naming neither the pass nor the shader.
+Vulkan lowers both to one `SAMPLED_IMAGE` descriptor and checks the layout at
+barrier time, which is why this was invisible there and why `Renderer3D`'s depth
+reads only ever failed on the default backend.
+
+So `DescriptorKind` has `SampledDepth`. This is the `CombinedImageSampler` case
+with the sign flipped: there Vulkan had a kind wgpu has not got, here one
+descriptor needs two declarations. Both of the renderer's depth reads name it --
+the frame set's shadow map and SSAO's depth buffer.
+
 ## Texture upload: the hole the sampling shader found
 
 `Textured.slang` exists and compiles. **There is no way to give a texture
@@ -599,8 +682,11 @@ says it cannot prove the thing yet is worth more than one that pretends.
 
 Landed since: `Resources::upload_texture` on both backends, and the Vulkan half
 is `UploadRing::copy_to_image` -- the image sibling of the `copy_to_buffer` that
-already existed. What remains is the *draw* half: a full-screen quad over a 2x2
-texture, read back, each quadrant compared exactly.
+already existed. The material path follows: `TextureCache::upload` built its
+desc with `TextureDesc::initial_data`, which `stormglass` never reads, so every
+texture it made was empty on the default backend — it now uploads through
+`upload_texture` like the rest. What remains is the *draw* half: a full-screen
+quad over a 2x2 texture, read back, each quadrant compared exactly.
 
 ### Two barriers, and the second one is the point
 

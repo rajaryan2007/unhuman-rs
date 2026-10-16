@@ -1,8 +1,11 @@
 //! Bind groups, through `chassis::Resources` and recorded into a command list.
 //!
-//! Both backends refused to implement `create_bind_group` with a comment saying
-//! no layout was declared. This is the layout being declared, and the group
-//! being built from it.
+//! `create_bind_group` is implemented: the layout is declared here and the set
+//! is allocated and written from it, so a group comes back as a real handle. The
+//! cases asserted are the rejections -- an undeclared binding, a descriptor kind
+//! that cannot be written, a stale buffer handle, an offset at or past the end
+//! of its buffer, and a combined image/sampler missing one of its halves -- plus
+//! an image and a sampler binding together.
 //!
 //! The interesting assertions are the *failures*: a bind group is a thing that
 //! binds nothing and looks fine until a shader reads the wrong memory, so the
@@ -197,10 +200,15 @@ fn an_offset_at_or_past_the_end_is_refused() {
     );
 
     // Aligned, inside the buffer, and leaving a range that is itself a multiple
-    // of the alignment: 252 + 4 == 256.
+    // of the alignment. The offset comes from the device rather than a literal:
+    // `minUniformBufferOffsetAlignment` is 4 on some drivers and 64 on others,
+    // and 252 is a multiple of only the first, so a hard-coded offset is a test
+    // that passes or fails by machine.
+    let alignment = context.capabilities.min_uniform_buffer_offset_alignment;
+    let offset = 256 - alignment.min(256);
     assert!(
         resources
-            .create_bind_group(&uniform_layout(0), &[(0, buffer, 252)], &[], &[])
+            .create_bind_group(&uniform_layout(0), &[(0, buffer, offset)], &[], &[])
             .is_ok(),
         "an aligned offset with an aligned range is the ordinary case",
     );

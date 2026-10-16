@@ -2,23 +2,26 @@
 resolver = "2"
 # `default-members` keeps `cargo build` / `cargo test` at the root working on a
 # machine with no cmake, no Vulkan SDK and no driver. The backend crates are
-# built explicitly with `-p stormbreaker`.
+# built explicitly with `-p stormbreaker` / `-p stormglass`. `editor` is left out
+# too: gpui is a git dependency and a long build, and nothing that does not open
+# a window should have to pay for it.
 default-members = [
     "UHE/src/core",
     "UHE/src/engine",
     "UHE/src/rhi",
     "UHE/src/shaders",
     "UHE/src/jobs",
-    "UHE/src/vault",
-    "UHE/src/renderer",
-    "UHE/src/ecs",
-    "UHE/src/physics",
-    "UHE/src/audio",
-    "UHE/src/ui",
     "UHE/src/events",
-    "UHE/platform/eyes",
-    "UHE/Stormbreaker/vulkan",
-    "UHE/Stormbreaker/wgpu",
+    "UHE/src/platform",
+    "UHE/src/scene",
+    "UHE/src/assets",
+    "UHE/src/renderer",
+    "UHE/src/audio",
+    "UHE/src/physics",
+    "UHE/src/editor",
+    "UHE/games/aimlab",
+    "UHE/bins/nocap",
+    "UHE/bins/sandbox",
 ]
 members = [
     "UHE/src/core",
@@ -26,14 +29,18 @@ members = [
     "UHE/src/rhi",
     "UHE/src/shaders",
     "UHE/src/jobs",
-    "UHE/src/vault",
-    "UHE/src/renderer",
-    "UHE/src/ecs",
-    "UHE/src/physics",
-    "UHE/src/audio",
-    "UHE/src/ui",
     "UHE/src/events",
-    "UHE/platform/eyes",
+    "UHE/src/platform",
+    "UHE/src/scene",
+    "UHE/src/assets",
+    "UHE/src/renderer",
+    "UHE/src/audio",
+    "UHE/src/physics",
+    "UHE/src/editor",
+    "UHE/games/aimlab",
+    "UHE/bins/nocap",
+    "UHE/bins/sandbox",
+    "UHE/bins/editor",
     "UHE/Stormbreaker/vulkan",
     "UHE/Stormbreaker/wgpu",
 ]
@@ -47,15 +54,38 @@ repository = "https://github.com/unhuman-engine/unhuman-rs.git"
 [workspace.dependencies]
 adam = { path = "UHE/src/core" }
 chassis = { path = "UHE/src/rhi" }
-eyes = { path = "UHE/platform/eyes" }
 forge = { path = "UHE/src/shaders" }
 grind = { path = "UHE/src/jobs" }
+pings = { path = "UHE/src/events" }
+eyes = { path = "UHE/src/platform" }
+meats = { path = "UHE/src/scene" }
+vault = { path = "UHE/src/assets" }
+bifrost = { path = "UHE/src/renderer" }
+wire = { path = "UHE/src/audio" }
+femur = { path = "UHE/src/physics" }
+mirror = { path = "UHE/src/editor" }
+engine = { path = "UHE/src/engine" }
+aimlab = { path = "UHE/games/aimlab" }
 stormbreaker = { path = "UHE/Stormbreaker/vulkan" }
 stormglass = { path = "UHE/Stormbreaker/wgpu" }
-vault = { path = "UHE/src/vault" }
-bifrost = { path = "UHE/src/renderer" }
-meats = { path = "UHE/src/ecs" }
-femur = { path = "UHE/src/physics" }
-wire = { path = "UHE/src/audio" }
-mirror = { path = "UHE/src/ui" }
-pings = { path = "UHE/src/events" }
+
+# Pinned to the versions already in this machine's cargo cache where one is
+# there, so the source of every dependency can be read before it is called into.
+glam = "0.33"
+hecs = "0.11"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+serde_yaml = "0.9"
+winit = "0.30"
+raw-window-handle = "0.6"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tga"] }
+gltf = { version = "1.4", features = ["utils", "names", "extensions"] }
+naga = { version = "30", features = ["wgsl-in", "spv-out", "spv-in"] }
+ab_glyph = "0.2"
+bytemuck = { version = "1", features = ["derive"] }
+log = "0.4"
+env_logger = "0.11"
+pollster = "0.4"
+rodio = "0.23"
+rapier3d = "0.36"
+wgpu = { version = "30", features = ["spirv"] }

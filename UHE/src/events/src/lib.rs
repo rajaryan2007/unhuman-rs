@@ -1,17 +1,12 @@
-//! Events and messages. Two separate mechanisms.
+//! Events: the bus, the key and mouse codes, the event enum.
+//!
+//! Ported from `UHE/src/UHE/Events/`, `UHE/src/UHE/Core/keyCodes.h`,
+//! `mouseButtonCodes.h` and the dispatch in `Core/Application.cpp`.
 
-pub mod dispatcher;
-pub mod event;
-pub mod message;
-pub mod observer;
-pub mod queue;
+mod bus;
+mod event;
+mod key;
 
-pub use dispatcher::*;
-pub use event::*;
-pub use message::*;
-pub use observer::*;
-pub use queue::*;
-
-// Common aliases.
-// Type aliases for frequently used concepts.
-pub use std::any::TypeId;
+pub use bus::{EventBus, Subscription};
+pub use event::Event;
+pub use key::{KeyCode, MouseButton};

@@ -1,22 +1,21 @@
 [package]
 name = "bifrost"
-description = "Renderer frontend. Backend-neutral: never names vk:: or wgpu::."
+description = "Renderer frontend: passes, cameras, materials, meshes, text"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
+adam = { workspace = true }
 chassis = { workspace = true }
+forge = { workspace = true }
 grind = { workspace = true }
-
-# The repo's canonical math crate (`docs/TRANSFER.md` §1), already the same
-# version `vault` and `femur` take, so a `vault::Vertex` position and a
-# `bifrost::Camera` translation are the same type and the scene loader needs no
-# conversion at the renderer boundary.
-#
-# Absent on purpose: `ash`, `wgpu`, `stormbreaker`, `stormglass`, `vault`. The
-# first four would break the one rule this crate exists to enforce; `vault` is a
-# Phase 3 concern (geometry upload) and is reached through handles and bounds,
-# not through its types, so the dependency arrow stays one-way.
-glam = "0.34"
+meats = { workspace = true }
+vault = { workspace = true }
+glam = { workspace = true }
+bytemuck = { workspace = true }
+ab_glyph = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
