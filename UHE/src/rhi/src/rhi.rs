@@ -46,9 +46,8 @@ pub struct Extent2d {
 
 /// Which submit/barrier path the device supports.
 ///
-/// Carried over from `VulkanExtensionCheck.h:12-17`. The C++ version gates on
-/// this correctly: every barrier and submit goes through one lowering point
-/// that picks the modern or legacy encoding from the tier.
+/// Every barrier and submit goes through one lowering point that picks the
+/// modern or legacy encoding from the tier.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum SyncTier {
     /// Plain `vkCmdPipelineBarrier` + `vkQueueSubmit`.
@@ -112,12 +111,9 @@ pub trait Swapchain {
 
 /// A secondary command list.
 ///
-/// **No barrier methods, by design.** Barriers come from the render graph, which
-/// derives them from the declared read/write sets. The moment a pass can hand-
-/// write a barrier, the graph can no longer prove the frame is correct — which
-/// is precisely the state the C++ engine is stuck in, with
-/// `BeginRenderPass` hand-writing `oldLayout = eUndefined`
-/// (`VulkanCommandBuffer.cpp:104,153`) alongside the graph's own synthesis.
+/// **No barrier methods, by design.** Barriers come from the render graph,
+/// derived from the declared read/write sets. The moment a pass can hand-write
+/// a barrier, the graph can no longer prove the frame is correct.
 pub trait CommandList {
     fn begin_rendering(&mut self, desc: &RenderPassDesc);
     fn end_rendering(&mut self);
@@ -161,34 +157,12 @@ pub trait Resources {
     /// A bind group: a set of resources a pipeline can read, written once and
     /// bound many times.
     ///
-    /// ## Why this takes a descriptor rather than handles
-    ///
-    /// It used to take `layout: &[u32]`, and that is why *neither backend
-    /// implemented it*. A list of opaque `u32`s carries no binding types, no
-    /// counts and no stages, so there was nothing to build a descriptor set
-    /// layout from -- the only correct implementation was to return an error, and
-    /// both did, with a comment saying a layout was needed.
-    ///
-    /// The layout is the same [`DescriptorSetLayoutDesc`] a pipeline declares for
-    /// its set, so a bind group and the pipeline that reads it are built from one
-    /// description and cannot disagree.
-    ///
-    /// ## Buffers, images and samplers
-    ///
-    /// One entry per *explicitly bound* binding. Buffers carry a byte offset;
-    /// images are a view and samplers are a sampler, both keyed by binding
-    /// number.
-    ///
-    /// Explicit numbers rather than positional, because a layout may declare
-    /// bindings 0 and 7 and leave the gap for another resource kind, and
-    /// "whichever index you passed" is not a rule anyone can hold in their head.
-    ///
-    /// ## Why images and samplers are two arguments
-    ///
-    /// Because Vulkan wants them as two bindings when they are two, and wgpu
-    /// wants one. `DescriptorKind::CombinedImageSampler` is the case where they
-    /// are one, and the backend collapses the two lists for it -- so a caller
-    /// writes one binding number and gets the pairing the layout asked for.
+    /// Takes the [`DescriptorSetLayoutDesc`] the pipeline declares, so both are
+    /// built from one description and cannot disagree. Entries are keyed by
+    /// binding number, since a layout may leave gaps for another resource kind;
+    /// images and samplers are separate lists because Vulkan wants two bindings
+    /// where wgpu wants one, and `DescriptorKind::CombinedImageSampler` collapses
+    /// them.
     fn create_bind_group(
         &mut self,
         layout: &DescriptorSetLayoutDesc,
@@ -209,36 +183,12 @@ pub trait Resources {
 
     /// Puts `data` into a texture.
     ///
-    /// ## Why this exists rather than `create_texture` taking initial data
+    /// Row order is top-to-bottom, the opposite of Vulkan's and wgpu's: one rule
+    /// for both backends rather than an option every caller must carry.
     ///
-    /// `create_buffer` does take it, and asymmetry is the whole problem: a
-    /// sampled texture was necessarily empty, so the descriptor path -- sampler,
-    /// image, bind group, draw -- could be built but never *proven*. Every way
-    /// to fake the contents produced a green test for a renderer that cannot
-    /// load an image.
-    ///
-    /// ## Row order, and why it is not configurable here
-    ///
-    /// Top-to-bottom. `origin` is top-left and `extent.height` counts downwards,
-    /// which is the opposite of Vulkan's and of wgpu's. A per-backend or
-    /// per-call option makes every caller carry the knowledge, and a test that
-    /// forgets it fails in a way that looks like a wrong texture. One rule,
-    /// both backends, documented here.
-    ///
-    /// ## Returns when submitted, not when finished
-    ///
-    /// The bytes are in a staging buffer and a copy has been *queued*. Destroying
-    /// the texture before the queue drains is
-    /// `VUID-vkDestroyImage-image-01000` -- "currently in use by VkCommandBuffer"
-    /// -- which is what validation reported the first time this ran, against the
-    /// test written to prove it worked.
-    ///
-    /// So this is not synchronous and no caller may treat it as one. The honest
-    /// shape is a wait before anything the upload touched is destroyed, and a
-    /// frame loop that waits once at frame end rather than once per upload.
-    ///
-    /// An earlier version of this comment claimed the opposite, which is the
-    /// worst kind of wrong: it is reassuring, and it would have been followed.
+    /// Returns when the copy is *queued*, not finished. Destroying the texture
+    /// before the queue drains is `VUID-vkDestroyImage-image-01000`, so a caller
+    /// must wait before touching anything the upload wrote.
     fn upload_texture(
         &mut self,
         texture: &Texture,
@@ -270,17 +220,13 @@ pub trait RenderGraph {
     /// Records every pass into its own command list and submits, in compiled
     /// order.
     ///
-    /// **The command lists are no longer passed in.** They used to be, and that
-    /// was a wart: it said the *caller* owned command-buffer lifetime, while both
-    /// executors own it. Vulkan's needs one pool per list -- the pool is the
-    /// external-synchronisation object for recording -- and wgpu's encoder holds a
-    /// borrow the caller cannot express. Making the caller manage either is a
-    /// requirement neither API actually has.
+    /// The backend owns command-list lifetime: Vulkan needs one pool per list and
+    /// wgpu's encoder holds a borrow the caller cannot express, so passing lists
+    /// in would impose a requirement neither API has.
     ///
-    /// `jobs` is the parallelism a backend *may* use for recording. It is a
-    /// parameter rather than a promise because one backend recording on N threads
-    /// and another on one is a legitimate difference, and the trait should not
-    /// imply otherwise.
+    /// `jobs` is the parallelism a backend *may* use for recording, not a
+    /// promise; one backend recording on N threads and another on one is a
+    /// legitimate difference.
     fn execute(&mut self, jobs: &grind::Jobs) -> Result<()>;
 }
 
@@ -293,12 +239,8 @@ pub trait Gpu {
     fn info(&self) -> &GpuInfo;
     /// The swapchain, or `None` when there is not one.
     ///
-    /// `Option`, not a bare reference. A headless run -- a GPU test, a
-    /// server-side frame, a CI job with no window -- has a real `Gpu` and no
-    /// swapchain, and a signature that says otherwise forces every caller to
-    /// carry a dummy. It also makes the difference between backends honest:
-    /// wgpu can create a headless device and Vulkan cannot create a window
-    /// without one.
+    /// A headless run has a real `Gpu` and no swapchain; a bare reference would
+    /// force every caller to carry a dummy.
     fn swapchain(&self) -> Option<&dyn Swapchain>;
     fn graph(&mut self) -> &mut dyn RenderGraph;
     fn resources(&mut self) -> &mut dyn Resources;
@@ -306,38 +248,18 @@ pub trait Gpu {
     /// Record and submit one compiled frame from a renderer frontend, in the
     /// graph's compiled order.
     ///
-    /// The frame was compiled by `chassis::graph`; the backend owns the executor,
-    /// the slot table and the command lists, so this is the one call that turns a
-    /// frontend's declaration into GPU work.
-    ///
     /// **Not `present`.** The frame loop is `frame_begin` -> `record_frame` ->
-    /// [`Gpu::submit`], and `submit` is where the present goes: one per frame, at
-    /// the point every caller reaches through `Box<dyn Gpu>`, which is what
-    /// `submit`'s own sentence ("submit every list produced this frame, then
-    /// present") describes. Two presents in one frame is a present of an image
-    /// nobody holds.
-    ///
-    /// ## Why these three arguments
-    ///
-    /// `CompiledGraph` is what both executors already take
-    /// (`VulkanRenderGraphExecutor::execute`, `WgpuRenderGraphExecutor::execute`)
-    /// and what a frontend's `RenderGraph::compile` produces -- a `CompiledFrame`
-    /// is that graph plus the builder's passes and resource names, which a
-    /// backend has no use for.
+    /// [`Gpu::submit`], and `submit` is where the present goes, once per frame.
     ///
     /// `SlotTable` is the frontend's half of the frame: the graph names resources
-    /// by slot index, the RHI names them by generational handle, and only the
-    /// frontend knows which handle it put at which slot. It fills every slot it
-    /// created and leaves the swapchain image's unbound -- a swapchain image has
-    /// no `Texture` handle -- and binding that one is the backend's job.
+    /// by slot, the RHI by generational handle, and only the frontend knows which
+    /// handle it put at which slot. The backend binds the unbound swapchain slot.
     ///
     /// `Arc`, not `&`, because a backend may record passes on worker threads and
-    /// a closure handed to a job pool is `'static`; a borrowed recorder cannot be
-    /// one.
+    /// a job pool's closure is `'static`.
     ///
-    /// The default refuses by name rather than recording nothing: a frame that
-    /// silently did nothing is the failure this method exists to remove, and a
-    /// backend that has not adopted it yet should say so.
+    /// The default refuses by name rather than recording nothing: a silent no-op
+    /// frame is the failure this method exists to remove.
     fn record_frame(
         &mut self,
         _frame: &crate::graph::CompiledGraph,
@@ -355,10 +277,9 @@ pub trait Gpu {
     ///
     /// This is the backend's own graph, not a frontend's: a renderer's frame goes
     /// through [`Gpu::record_frame`], which also presents when a swapchain is
-    /// attached. Which of the two is reachable differs by backend — Vulkan can
-    /// only run an empty `submit`, because nothing can declare into its graph
-    /// adapter — so a frame loop that draws a frontend's frame calls
-    /// `record_frame` and does not need `submit` at all.
+    /// attached. Vulkan can only run an empty `submit`, because nothing can
+    /// declare into its graph adapter, so a frontend frame loop calls
+    /// `record_frame` and not `submit`.
     fn submit(&mut self) -> Result<()>;
     /// Blocks until the device is idle. Test and shutdown only.
     fn wait_idle(&mut self);

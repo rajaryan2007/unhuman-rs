@@ -1,8 +1,7 @@
 //! Resource states, accesses and stages.
 //!
-//! Backend-neutral on purpose. `ImageState` maps 1:1 onto the C++ enum
-//! (`VulkanTypes.h`), but nothing here is a Vulkan type, so the compiler can be
-//! exercised with no device and no driver.
+//! Backend-neutral on purpose: nothing here is a Vulkan type, so the compiler
+//! can be exercised with no device and no driver.
 
 /// Where a texture's memory is expected to be at a given point in the frame.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
@@ -67,10 +66,9 @@ pub enum PassType {
 
 /// Which queue a pass records into.
 ///
-/// Carried through compilation but not yet a split point. The C++ carries
-/// `RGQueue` for the same reason and nothing branches on it until a second
-/// queue family exists; splitting later is a compiler change, not a graph
-/// rewrite.
+/// Carried through compilation but not yet a split point: nothing branches on it
+/// until a second queue family exists, and splitting later is a compiler change,
+/// not a graph rewrite.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub enum Queue {
     #[default]
@@ -84,10 +82,7 @@ pub enum LoadOp {
     Load,
     #[default]
     Clear,
-    /// Valid as a source state for the first use of a transient resource, and
-    /// the honest replacement for the C++ habit of hardcoding
-    /// `oldLayout = eUndefined` on every entry
-    /// (`VulkanCommandBuffer.cpp:104,153`).
+    /// Valid as a source state on first use of a transient resource.
     DontCare,
 }
 
@@ -180,7 +175,7 @@ pub enum ErrorKind {
     DoubleWrite,
     /// A resource was read at a version that no pass produces.
     ReadBeforeWrite,
-    /// `add_pass` was never given a body — a placeholder left in the graph.
+    /// `add_pass` was never given a body: a placeholder left in the graph.
     UnsubmittedPass,
     /// One pass needed the same resource in two different states.
     PassStateConflict,
@@ -232,11 +227,9 @@ impl std::fmt::Display for ValidationError {
 
 /// A texture state transition, in backend-neutral terms.
 ///
-/// The C++ compiler writes `VkImageMemoryBarrier` here
-/// (`VulkanRenderGraphCompiler.cpp:406-476`). Emitting this instead keeps the
-/// compiler testable without a device, and leaves exactly one place in
-/// stormbreaker that turns a transition into `vkCmdPipelineBarrier2` or
-/// `vkCmdPipelineBarrier` depending on `SyncTier`.
+/// Emitting this keeps the compiler testable without a device, and leaves one
+/// place in the Vulkan backend that turns a transition into
+/// `vkCmdPipelineBarrier2` or `vkCmdPipelineBarrier` depending on `SyncTier`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ImageBarrier {
     pub texture: TextureId,

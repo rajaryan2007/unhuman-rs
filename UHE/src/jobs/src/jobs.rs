@@ -38,12 +38,10 @@ impl JobCounter {
 
     /// `AcqRel`, not `Release`.
     ///
-    /// A waiter observes zero via a single `Acquire` load, which only
-    /// synchronizes with whichever thread performed the *final* decrement.
-    /// With a release-only RMW, every other worker's writes stay unordered and
-    /// become visible or not at random. `AcqRel` on every decrement chains the
-    /// RMWs into one release sequence, so the last one carries every prior
-    /// job's writes. The C++ engine has this exact flaw.
+    /// A waiter observes zero via a single `Acquire` load, which only synchronises
+    /// with the thread that performed the final decrement. `AcqRel` on every
+    /// decrement chains the RMWs into one release sequence, so the last carries
+    /// every prior job's writes.
     fn dec(&self) {
         self.0.fetch_sub(1, Ordering::AcqRel);
     }
@@ -59,11 +57,9 @@ struct Shared {
 /// Runs one dequeued job and settles both counters. Shared by `try_pop_job` and
 /// the worker loop so there is exactly one place that decrements them.
 ///
-/// Note the ordering: the counter settles after the body returns but before the
-/// job closure itself is destroyed, so captured `Arc`s outlive the signal by a
-/// few instructions. That matches the C++ engine, where `std::function` is also
-/// destroyed after `fetch_sub`. A counter therefore means "the body finished",
-/// not "the body's captures are gone".
+/// The counter settles after the body returns but before the closure is
+/// destroyed, so a counter means "the body finished", not "the captures are
+/// gone".
 fn run_queued(job: QueuedJob, shared: &Shared) {
     let (job, counter) = job;
     job();
@@ -89,8 +85,7 @@ pub struct Jobs {
 
 impl Jobs {
     /// Spawns `hardware_concurrency() - 1` workers, leaving one core for the
-    /// calling thread. The `- 1` matters on big.LITTLE Android targets, which
-    /// the C++ engine targeted explicitly.
+    /// calling thread. The `- 1` matters on big.LITTLE targets.
     pub fn new() -> Self {
         let cores = thread::available_parallelism().map_or(4, |n| n.get());
         let num_workers = cores.saturating_sub(1).max(1);
@@ -183,8 +178,8 @@ impl Jobs {
     }
 
     /// Blocks until `counter` reaches zero. While waiting the calling thread
-    /// steals queued jobs and runs them, so waiting is never idle CPU time —
-    /// and a counter whose jobs are all still queued still completes on a
+    /// steals queued jobs and runs them, so waiting is never idle CPU time, and a
+    /// counter whose jobs are all still queued still completes on a
     /// single-worker machine instead of deadlocking.
     pub fn wait(&self, counter: &JobCounter) {
         // The counter is re-checked every iteration and a successful pop does

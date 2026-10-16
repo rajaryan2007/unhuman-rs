@@ -1,28 +1,13 @@
 //! Which backend, and how that was decided.
 //!
-//! ## wgpu is the default, and that is a stability decision
+//! wgpu is the default: when a frame goes wrong the question is always "is this
+//! the backend or the engine", and defaulting to the one that usually works means
+//! most answers are "the engine". Vulkan is fully implemented and opt-in, because
+//! opting out is what you do when something is unstable.
 //!
-//! Not a performance one and not a preference. Vulkan gives per-barrier control
-//! and bare-metal speed; wgpu gives a driver that works. When a frame goes wrong
-//! the question is always "is this the backend or is this the engine", and a
-//! default that is *the thing that usually works* means the first answer is
-//! usually "the engine".
-//!
-//! Vulkan is still fully implemented and fully tested -- it is the path to bare
-//! metal and the only one that can reach a 1.0 device. It is opt-in rather than
-//! opt-out because opting out is what you do when something is unstable, and you
-//! should not have to rebuild to find out whether that is what is happening.
-//!
-//! ## Three ways to say it, in order
-//!
-//! 1. `--backend vulkan` on the command line.
-//! 2. `UHE_BACKEND=vulkan` in the environment.
-//! 3. A `backend` key in the settings file.
-//!
-//! The first wins. An unrecognised value is an error rather than a silent
-//! fallback: a launcher that passes `--backend vlkan` and gets wgpu has a bug
-//! that will be reported as "the wrong backend", and the message that says so is
-//! worth more than the convenience.
+//! Three ways to say it, in order: `--backend`, `UHE_BACKEND`, then a `backend`
+//! key in the settings file. The first wins. An unrecognised value is an error,
+//! not a silent fallback, so "the wrong backend" is reportable.
 
 use std::fmt;
 use std::str::FromStr;

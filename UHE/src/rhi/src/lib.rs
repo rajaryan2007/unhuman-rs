@@ -1,7 +1,4 @@
-//! The RHI interface. Vulkan's problem is not that it was abstracted, it is
-//! that the abstraction was hollow: one implementation, `void*` handles
-//! (`UHE/src/UHE/RHI/RHITypes.h:37-41`), and the "backend-agnostic" layer
-//! `dynamic_cast` straight through it (`UHE/src/UHE/ImGui/ImGuiLayer.cpp:11`).
+//! The RHI interface.
 //!
 //! The test that keeps this crate honest: **no Vulkan type appears in any
 //! signature outside the backend.** That is enforced here by the dependency
@@ -9,8 +6,8 @@
 
 /// The render graph: declaration, versioning, compilation.
 ///
-/// Backend-neutral by construction -- nothing here imports `ash` or any driver,
-/// which is what lets both `UHE/Stormbreaker/*` backends use the same one.
+/// Backend-neutral by construction: nothing here imports `ash` or any driver,
+/// which is what lets both backends use the same one.
 pub mod graph;
 
 pub mod backend;

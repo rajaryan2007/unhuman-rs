@@ -27,8 +27,7 @@ struct TaskNode {
 /// `execute` blocks until every task has completed, so the nodes outlive all
 /// tasks, and `TaskNode` is `Sync` (an `Arc` to a `Send + Sync` closure, an
 /// atomic, and plain immutable data). Nothing is mutated during execution
-/// except `deps_remaining`. The C++ version gets this for free by capturing
-/// `this`; the invariant is identical.
+/// except `deps_remaining`.
 #[derive(Clone, Copy)]
 struct GraphPtr(*const TaskNode);
 
@@ -190,8 +189,8 @@ fn resolve(ptr: GraphPtr, id: TaskId, jobs: Arc<Jobs>, total_remaining: Arc<Atom
     }
 
     // MUST be the last access to graph state. A waiter that observes 0 has the
-    // right to drop the graph, so any access after this line would race with
-    // that destruction. Found by ThreadSanitizer in the C++ engine.
+    // right to drop the graph, so any access after this line races with that
+    // destruction.
     // AcqRel: the waiter in `execute` observes zero with a single Acquire
     // load, so every decrement must chain the release sequence.
     total_remaining.fetch_sub(1, Ordering::AcqRel);

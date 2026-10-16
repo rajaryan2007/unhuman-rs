@@ -115,20 +115,9 @@ impl Default for PrimitiveState {
     }
 }
 
-// Note on winding, kept because it is a real Vulkan trap -- but *not* asserted
-// here, because a hypothesis about it turned out to be wrong once measured.
-//
-// Vulkan's viewport transform maps NDC +Y to framebuffer -Y: there is no
-// inherited GL-style Y-flip. So a triangle wound counter-clockwise in NDC --
-// which is what every mesh exporter produces and what `front_face: 0` names --
-// appears clockwise in framebuffer coordinates, and with `cull_mode: 1` the
-// winding decides whether it survives. Expect to set `front_face: 1` somewhere.
-//
-// What actually caused an all-black first-triangle frame is *not* recorded here.
-// Culling was blamed, then measured, and disproved: the same triangle draws
-// identically under cull mode 0, 1 and 2. The real cause was elsewhere and the
-// intermediate change that appeared to fix it was made alongside the real one.
-// A comment asserting a cause that has been falsified is worse than no comment.
+// Vulkan's viewport transform maps NDC +Y to framebuffer -Y, with no GL-style
+// Y-flip. A triangle wound counter-clockwise in NDC (front_face: 0) appears
+// clockwise in framebuffer coordinates, so expect to set front_face: 1 somewhere.
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct DepthState {
@@ -198,9 +187,8 @@ impl ShaderStage {
 
 /// Which stages may read one binding.
 ///
-/// A mask rather than a single stage because a framebuffer-sized buffer is
-/// commonly written by the vertex stage and read by the fragment stage, and
-/// declaring it twice is how that turns into a layout mismatch.
+/// A mask rather than a single stage, because one buffer is commonly written by
+/// the vertex stage and read by the fragment stage.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
 pub struct StageMask(pub u32);
 
@@ -236,20 +224,16 @@ pub enum DescriptorKind {
     SampledImage,
     /// A depth texture read as a texture rather than an attachment.
     ///
-    /// A separate kind because wgpu is not Vulkan here: a depth view needs
-    /// `TextureSampleType::Depth`, and a `Float` binding against one is a layout
-    /// mismatch the driver refuses. Vulkan takes the same `SAMPLED_IMAGE`
-    /// descriptor either way and checks the layout at barrier time instead --
-    /// the asymmetry `docs/WORK.md` records for `CombinedImageSampler`, with the
-    /// sign flipped: there Vulkan is the one with a kind wgpu has not got, here
-    /// the two need different declarations for one descriptor.
+    /// wgpu gives a depth view `TextureSampleType::Depth`, and a `Float` binding
+    /// against one is a layout mismatch the driver refuses; Vulkan takes the same
+    /// `SAMPLED_IMAGE` descriptor either way and checks the layout at barrier
+    /// time instead.
     SampledDepth,
     Sampler,
     CombinedImageSampler,
     StorageImage,
-    /// Subpass input. Real, and the backend already had it: the RHI enum was the
-    /// one missing a case, so a shader could declare a layout the RHI could not
-    /// describe.
+    /// Subpass input. The backend already had it; the enum was missing the case,
+    /// so a shader could declare a layout the RHI could not describe.
     InputAttachment,
 }
 
@@ -272,11 +256,9 @@ pub enum AddressMode {
 
 /// A texture sampler.
 ///
-/// Filter and address mode only. Anisotropy, compare (for shadow maps) and
-/// border colour are deliberately absent rather than defaulted: a sampler that
-/// silently enables anisotropy on a backend that spells it differently, or that
-/// quietly turns off depth comparison and renders shadows wrong, is worse than
-/// one that cannot be asked for it.
+/// Filter and address mode only. Anisotropy, compare and border colour are
+/// deliberately absent rather than defaulted, because a silently different
+/// sampler is worse than one that cannot be asked for.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct SamplerDesc {
     pub mag_filter: Filter,
@@ -374,20 +356,16 @@ impl DescriptorSetLayoutDesc {
 
     /// True when two declarations can share one `VkDescriptorSetLayout`.
     ///
-    /// The label is deliberately excluded: it exists for diagnostics, and
-    /// including it would mean two identical layouts stop deduping the moment
-    /// one of them is renamed.
+    /// The label is excluded: two layouts that differ only by name are the same.
     pub fn is_compatible(&self, other: &Self) -> bool {
         self.bindings == other.bindings
     }
 
     /// A cache key with the same exclusions as [`Self::is_compatible`].
     ///
-    /// Label excluded for the same reason: it exists for diagnostics, and two
-    /// layouts that differ only by name are the same layout. Including it would
-    /// mean the hash and `is_compatible` disagree -- one dedupes, the other does
-    /// not -- and which of the two a backend believes decides whether a bind
-    /// group and a pipeline end up with the same object.
+    /// Must agree with `is_compatible`: one dedupes, the other is its cache key,
+    /// so a disagreement changes whether a bind group and a pipeline share an
+    /// object.
     pub fn hash(&self) -> u64 {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -408,10 +386,8 @@ pub struct PipelineDesc {
     pub label: String,
     /// Every stage this pipeline runs.
     ///
-    /// A list, not a single handle: a graphics pipeline is a vertex module and a
-    /// fragment module, and Vulkan has no way to compile them from one file into
-    /// one module. A single `shader` field made "add a fragment stage" a change
-    /// to the RHI interface rather than a field.
+    /// A list, not a single handle: Vulkan has no way to compile a vertex and a
+    /// fragment module from one file into one module.
     pub shaders: Vec<ShaderStageDesc>,
     /// Descriptor set shapes, indexed by set number. Empty means the pipeline
     /// reads no descriptors, which is legal and common.
@@ -441,8 +417,7 @@ pub struct ColorAttachmentDesc {
 pub enum LoadOp {
     Load,
     Clear,
-    /// Matches the C++ habit of hardcoding `oldLayout = eUndefined` on entry
-    /// (`VulkanCommandBuffer.cpp:104,153`). Now it is a choice the pass makes.
+    /// Valid as a source state on first use of a transient resource.
     DontCare,
 }
 
@@ -456,11 +431,8 @@ pub struct DepthAttachmentDesc {
 
 /// Attachments a pass writes during one `begin_rendering` scope.
 ///
-/// This is the shape a frame graph pass sees. It carries no layouts: layout
-/// transitions and barriers are the render graph's job, derived from the
-/// declared read/write sets. That is the property that keeps
-/// `VulkanRenderGraphExecutor.h:106-134` — passes get no barrier API — true on
-/// the Rust side too.
+/// Carries no layouts: transitions and barriers are the render graph's job,
+/// derived from the declared read/write sets. A pass gets no barrier API.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct RenderPassDesc {
     pub label: String,

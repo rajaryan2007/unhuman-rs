@@ -1,58 +1,17 @@
 //! The render graph facade: declaration, versioning, compilation.
 //!
-//! Ported from `UHE/src/Platform/Vulkan/RenderGraph/`, and **no longer part of
-//! the Vulkan backend**.
+//! Backend-neutral: the compiler emits [`ImageBarrier`] rather than a Vulkan
+//! barrier, so a backend lowers it and the whole compiler is testable with no
+//! device, no driver and no Vulkan loader.
 //!
-//! ## Why it moved
-//!
-//! It was in `UHE/Stormbreaker/vulkan/` because that is where the C++ has it --
-//! `UHE/src/Platform/Vulkan/RenderGraph/`. That was the right reason for a
-//! one-backend engine and the wrong reason for a two-backend one: a wgpu backend
-//! that needs the graph would have had to depend on the Vulkan crate, and two
-//! backends depending on each other is not an architecture, it is a fork waiting
-//! to happen.
-//!
-//! The split was already there and nobody had acted on it: only the *executor*
-//! imported `ash` or `chassis`. The types, the builder, the compiler and this
-//! facade touched nothing, and had done since the first port. They moved because
-//! the dependency arrow was already correct -- the files were just filed in the
-//! wrong place.
-//!
-//! ## What stayed behind
-//!
-//! `VulkanRenderGraphExecutor.rs`, in `UHE/Stormbreaker/vulkan/`. An executor
-//! holds a command buffer and records barriers, so it is genuinely the backend's.
-//! The wgpu backend has its own, which uses the graph's *ordering* and none of
-//! its barriers -- wgpu inserts its own transitions.
-//!
-//! ## The file names changed, and that is a real cost
-//!
-//! `VulkanRenderGraphTypes.h` is now `graph/types.rs`. Two backends cannot both
-//! own a file called `VulkanRenderGraphCompiler.rs`, and a file called that in
-//! `chassis` would be a lie. The C++ names are kept in `docs/WORK.md` so the
-//! mapping is still findable.
-//!
-//! One structural difference, and it is deliberate: **this graph emits
-//! backend-neutral barriers.** The C++ compiler writes `VkImageMemoryBarrier`
-//! directly (`VulkanRenderGraphCompiler.cpp:406-476`), which is why
-//! `tests/rendergraph` has to compile 11 graph sources plus a `VmaDispatchStub`
-//! just to test a topological sort. Here the compiler emits
-//! [`ImageBarrier`], and `VulkanBarrierEncoder.rs` lowers it. That is what makes
-//! the `SyncTier` decision in the C++ `docs/vulkan-sync-and-rendergraph.md` a
-//! single point instead of a property of every barrier the graph happens to emit.
-//!
-//! Consequence: the whole compiler is testable with no device, no driver and no
-//! Vulkan loader.
-//!
-//! The rule the facade exists to enforce, worth stating because it is the whole
-//! reason a graph exists at all:
+//! The rule the facade exists to enforce:
 //!
 //! > A pass may only declare read access to a resource at a version it did not
 //! > itself write in that same frame.
 //!
-//! That is not an optimisation. It is what makes parallelism safe: a resource
-//! written by pass 3 cannot be read by pass 1, so no two passes touch the same
-//! resource version without the graph knowing the order between them.
+//! That is not an optimisation. A resource written by pass 3 cannot be read by
+//! pass 1, so no two passes touch the same resource version without the graph
+//! knowing the order between them.
 
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -93,10 +52,9 @@ pub struct CompiledFrame {
 
 /// The render graph.
 ///
-/// `Clone` shares one graph behind a mutex. This is not incidental: the C++
-/// `VulkanRenderGraph.h:44-58` holds a `std::mutex` for exactly the same reason,
-/// and the frontend and backend both need the graph in the same frame. A
-/// deep-copying `Clone` would make the unsynchronized case look safe.
+/// `Clone` shares one graph behind a mutex: the frontend and backend both need
+/// the graph in the same frame, and a deep-copying `Clone` would make the
+/// unsynchronised case look safe.
 #[derive(Clone)]
 pub struct VulkanRenderGraph {
     inner: Arc<Mutex<Builder>>,
@@ -214,8 +172,8 @@ impl VulkanRenderGraph {
     ///
     /// One place to hand back to `present-src` or the executor's epilogue. The
     /// alternative is every consumer guessing, and a guess here is a layout that
-    /// disagrees with the next frame's first barrier — which validation reports
-    /// as a sync hazard hundreds of lines away from the mistake.
+    /// disagrees with the next frame's first barrier, which validation reports
+    /// as a sync hazard far from the mistake.
     pub fn final_states(frame: &CompiledFrame) -> Vec<(TextureId, ImageState)> {
         let mut states: Vec<(TextureId, ImageState)> = Vec::new();
         for (index, slot) in frame.resources.textures().iter().enumerate() {
@@ -236,10 +194,8 @@ impl VulkanRenderGraph {
     /// Transient aliasing candidates: textures whose lifetimes do not overlap,
     /// so they could share memory.
     ///
-    /// Returns pairs. Not yet acted on — `VulkanAllocation.rs` allocates
-    /// dedicated memory per texture, and aliasing needs barrier bookkeeping
-    /// during recording, which is a separate piece of work. Reported so the
-    /// frame dump can show what aliasing would buy.
+    /// Not yet acted on: aliasing needs barrier bookkeeping during recording, a
+    /// separate piece of work. Reported so the frame dump can show what it buys.
     pub fn aliasing_candidates(frame: &CompiledFrame) -> Vec<(ResourceLifetime, ResourceLifetime)> {
         let lifetimes = &frame.graph.lifetimes;
         let mut out = Vec::new();

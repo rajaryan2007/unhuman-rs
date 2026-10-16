@@ -3,14 +3,8 @@ use std::marker::PhantomData;
 
 /// A generational handle to a backend resource.
 ///
-/// Replaces the C++ `void*`-based `BufferHandle`/`TextureHandle`
-/// (`RHITypes.h:37-41`), which could only be validated by `reinterpret_cast`
-/// round trips. A handle whose slot has been freed and reused fails its
-/// generation check instead of silently aliasing a different object.
-///
-/// Reuses the shape of `RGHandle<T>{index, generation}`
-/// (`VulkanRenderGraphTypes.h:40-51`), promoted from render-graph-internal to
-/// the whole RHI.
+/// A handle whose slot has been freed and reused fails its generation check
+/// instead of silently aliasing a different object.
 pub struct Handle<T> {
     index: u32,
     generation: u32,
@@ -80,9 +74,8 @@ impl<T> fmt::Debug for Handle<T> {
     }
 }
 
-/// Typed handles for the resources a backend owns. The newtype is what stops a
-/// `Texture` being passed where a `Pipeline` is expected — the class of bug the
-/// `void*` handles allowed silently.
+/// Typed handles for the resources a backend owns. The newtype stops a `Texture`
+/// being passed where a `Pipeline` is expected.
 pub type Buffer = Handle<BufferTag>;
 pub type Texture = Handle<TextureTag>;
 pub type ImageView = Handle<ImageViewTag>;
@@ -91,10 +84,9 @@ pub type Shader = Handle<ShaderTag>;
 pub type BindGroup = Handle<BindGroupTag>;
 /// A sampler: filter, address mode, compare.
 ///
-/// Its own handle and its own tag. It is not a `Texture` and not an
-/// `ImageView`, and folding it into either would make a bind group's "which
-/// image, filtered how" unexpressible -- which is exactly the pair Vulkan wants
-/// as two bindings and wgpu wants as one.
+/// Its own handle and tag: folding it into a `Texture` or `ImageView` would make
+/// a bind group's "which image, filtered how" unexpressible, which is exactly the
+/// pair Vulkan wants as two bindings and wgpu wants as one.
 pub type Sampler = Handle<SamplerTag>;
 
 #[derive(Debug)]

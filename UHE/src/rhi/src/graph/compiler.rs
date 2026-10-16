@@ -134,9 +134,8 @@ pub fn validate(passes: &[PassDesc], resources: &Resources) -> Vec<ValidationErr
             }
         }
 
-        // Read and write the same texture in one pass is ambiguous here: the
-        // pass cannot see which version the read binds to once its own write
-        // lands. Matches the C++ `PassStateConflict`.
+        // Read and write the same texture in one pass is ambiguous: the pass
+        // cannot see which version the read binds to once its own write lands.
         for read in &pass.reads {
             if let ResourceAccess::Texture(id, _) = read {
                 if written
@@ -250,7 +249,7 @@ fn topological_order(
 /// Drops passes that cannot reach an imported resource.
 ///
 /// Roots are passes touching an import, read or written. A pass survives if a
-/// root transitively depends on it — producer edges only, because dropping the
+/// root transitively depends on it, producer edges only, because dropping the
 /// consumers of a culled pass is the entire point. A frame with no imports at
 /// all is therefore empty, which is correct: nothing observable is produced.
 fn cull(passes: &[PassDesc], resources: &Resources, order: Vec<usize>) -> Vec<usize> {
@@ -293,21 +292,14 @@ fn cull(passes: &[PassDesc], resources: &Resources, order: Vec<usize>) -> Vec<us
 /// Walks the frame in execution order and emits one barrier per state change.
 ///
 /// **Pre-barriers only.** Each pass owns the transitions for everything it
-/// touches, recorded into its own command list, so a list is self-contained and
-/// passes can record in parallel with no ordering constraint between them. That
-/// is what the C++ executor's pre/post barrier pair around a *range* of passes
-/// cannot do — with one shared command buffer the range boundary is the only
-/// place a barrier can go. The single exception is the final transition of an
-/// imported resource, which has to follow the last pass that touches it; that
-/// becomes that pass's post-barrier.
+/// touches, in its own command list, so passes can record in parallel. The one
+/// exception is the final transition of an imported resource, which becomes the
+/// last touching pass's post-barrier.
 /// The narrowest access scope a pass declared for a buffer, in the given role.
 ///
-/// Narrow, because a barrier that claims more access than the pass actually
-/// takes is not conservative -- it is a stall.
-///
-/// The role matters and an earlier version of this ignored it, which made a
-/// transfer write and a transfer read look identical and dropped the barrier
-/// between them: the exact hazard the barrier exists to express.
+/// Narrow: a barrier claiming more access than the pass takes is a stall, not
+/// conservatism. The role matters, or a transfer write and read look identical
+/// and the barrier between them is dropped.
 fn buffer_access_of(pass: &PassDesc, buffer: BufferId, role: AccessRole) -> (Access, Stage) {
     let list = match role {
         AccessRole::Read => &pass.reads,

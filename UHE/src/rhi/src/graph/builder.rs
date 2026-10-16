@@ -7,7 +7,7 @@ use super::types::{
 /// The graph, as declared. Declaration only: no GPU work, no closures.
 ///
 /// Built fresh every frame and recompiled every frame. There is deliberately no
-/// compile cache — at realistic pass counts the compile is microseconds, and a
+/// compile cache: at realistic pass counts the compile is microseconds, and a
 /// structural-hash cache is complexity with no measurable payoff.
 pub struct RenderGraph {
     resources: Resources,
@@ -81,7 +81,7 @@ impl RenderGraph {
     }
 
     /// Validates, orders and barrier-synthesises. Returns the compiled frame or
-    /// every error found — validation collects all of them before failing, so one
+    /// every error found; validation collects all of them before failing, so one
     /// run reports every mistake rather than the first.
     pub fn compile(&self) -> Result<super::compiler::CompiledGraph, Vec<ValidationError>> {
         super::compiler::compile(&self.passes, &self.resources)

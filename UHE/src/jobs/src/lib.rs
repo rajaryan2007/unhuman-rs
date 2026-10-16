@@ -1,9 +1,8 @@
 //! Job system and task graph.
 //!
-//! Ported 1:1 from `UHE/src/UHE/Jobsystem/` in the C++ engine. The two
-//! memory-ordering invariants documented there are load-bearing and are
-//! preserved verbatim in the comments below; both were found by ThreadSanitizer
-//! or by reasoning about a missed wakeup.
+//! Two memory-ordering invariants are load-bearing: the decrement release
+//! sequence in `JobCounter::dec` and the final decrement in `resolve`. Both are
+//! documented at their definitions.
 
 mod jobs;
 mod taskgraph;

@@ -89,8 +89,7 @@ fn thread_index_is_in_range() {
 
 /// The invariant behind `dep_count == 0` root scanning: a task is dispatched
 /// exactly once, by the root scan or by its last arriving predecessor, never
-/// both. A violation of that showed up in the C++ engine as a task running
-/// twice.
+/// both. A violation shows up as a task running twice.
 #[test]
 fn every_task_runs_exactly_once() {
     let jobs = Arc::new(Jobs::new());

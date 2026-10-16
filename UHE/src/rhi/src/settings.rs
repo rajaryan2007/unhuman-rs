@@ -1,30 +1,16 @@
 //! A settings file, and the part of it that chooses a backend.
 //!
-//! ## Why this is so small
-//!
-//! It is a `key = value` file with no sections, because the only thing in it
-//! today is `backend`. A settings system with nesting, types and inheritance
-//! would be a project, and everything except the backend choice does not have a
-//! caller yet. It can grow; it cannot grow *back*.
-//!
-//! ## What is deliberately not here
-//!
-//! No path searching, no environment reading, no defaults layered over defaults.
-//! [`Settings::parse`] takes a string. Finding the file is
-//! `engine`'s job, and doing it here would mean a library that cannot be tested
-//! without a filesystem -- which is the whole reason [`chassis::backend`] takes
-//! its three sources as arguments and reads none of them itself.
-//!
-//! ## Format
+//! A `key = value` file with no sections, because the only key today is
+//! `backend`. No path searching or environment reading: [`Settings::parse`] takes
+//! a string, so the library is testable without a filesystem.
 //!
 //! ```text
 //! # unhuman.settings
 //! backend = vulkan
 //! ```
 //!
-//! Blank lines and `#` comments are ignored. Keys are compared
-//! case-insensitively. Anything else is a key we do not know about, and is
-//! *ignored* rather than refused -- see [`Settings::parse`].
+//! Blank lines and `#` comments are ignored. Keys are case-insensitive; unknown
+//! keys are ignored rather than refused, see [`Settings::parse`].
 
 use std::collections::BTreeMap;
 

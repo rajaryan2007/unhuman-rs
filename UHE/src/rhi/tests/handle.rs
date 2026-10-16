@@ -79,9 +79,7 @@ fn handles_are_distinct_per_resource_type() {
     let mut pipelines: Registry<u32, chassis::PipelineTag> = Registry::new();
 
     // Both registries hand out index 0, but the types cannot be confused: a
-    // `Buffer` will not typecheck where a `Pipeline` is expected. This is the
-    // class of bug the C++ `void*` handles allowed silently
-    // (`RHITypes.h:37-41`).
+    // `Buffer` will not typecheck where a `Pipeline` is expected.
     let buffer: Buffer = buffers.create(7);
     let pipeline: Pipeline = pipelines.create(9);
 

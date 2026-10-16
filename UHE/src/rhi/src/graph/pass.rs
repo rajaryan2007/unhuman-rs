@@ -1,23 +1,15 @@
 //! What a backend hands a pass, and what a pass hands back.
 //!
-//! ## Why these live here and not in a backend
-//!
 //! `PassScope`, `PassRecorder` and `SlotTable` are the seam between the renderer
 //! and a backend. A renderer implements `PassRecorder`; a backend calls it once
-//! per pass with a scope. Neither mentions the other, and the fact that this
-//! file is in `chassis` rather than in `UHE/Stormbreaker/vulkan/` is the whole
-//! argument for two backends: a wgpu executor calls the same trait with the same
-//! scope, and the renderer above it cannot tell.
-//!
-//! They were in `VulkanRenderGraphExecutor.rs` until the second backend needed
-//! them, for the same reason the render graph was: the dependency arrow was
-//! already correct and only the filing was wrong.
+//! per pass with a scope, so a wgpu executor and a Vulkan one are interchangeable
+//! from the renderer's side.
 
 use crate::{Buffer, Texture};
 
 /// Graph slot index to the handle the RHI uses.
 ///
-/// The graph names resources by slot — `TextureId` is a `u32` — and the RHI names
+/// The graph names resources by slot (`TextureId` is a `u32`) and the RHI names
 /// them by generational handle. This is the translation.
 ///
 /// It has to live somewhere a backend and the renderer can both reach, and it is
@@ -75,7 +67,7 @@ impl SlotTable {
 ///
 /// Deliberately narrow. A pass that could reach the whole graph could record work
 /// that belongs to another pass, and then the graph's ordering guarantee would
-/// cover the barriers but not the draws — which is the bug the graph exists to
+/// cover the barriers but not the draws, which is the bug the graph exists to
 /// prevent.
 pub struct PassScope<'a> {
     /// The pass's position in the compiled order. Also its identity.
@@ -102,11 +94,9 @@ impl<'a> PassScope<'a> {
 
 /// Records one pass into one command list.
 ///
-/// `Send + Sync` because a backend may call it from worker threads — the Vulkan
-/// executor will, once its registries are shareable. A frontend that cannot share
-/// its recording code across threads cannot use that path, which is a real
-/// constraint rather than something to paper over with a mutex that puts the
-/// backend back where the C++ started.
+/// `Send + Sync` because a backend may call it from worker threads, so a frontend
+/// that cannot share its recording code across threads cannot use that path. That
+/// is a real constraint, not something to paper over with a mutex.
 pub trait PassRecorder: Send + Sync {
     fn record(
         &self,
