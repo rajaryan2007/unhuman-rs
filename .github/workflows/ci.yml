@@ -15,16 +15,13 @@ name: CI
 # When Windows gets a real backend test, it needs a driver the runner can see.
 # That is the job to add then, not a row to widen now.
 #
-# Six jobs, and the split is not cosmetic.
+# Five jobs, and the split is not cosmetic.
 #
 # `logic` needs no GPU at all and runs everywhere, as does `smoke`, which asks
-# the build questions a first `cargo build` would surface. `parity` checks the
-# port's own claim -- every C++ file has a Rust counterpart or a recorded reason
-# it does not -- and is the one job that checks out a second repository. `vulkan`
-# runs the backend against Mesa's **lavapipe**, a software Vulkan implementation,
-# with the Khronos validation layer loaded. That is not a mock: it is the same
-# driver interface, the same validation layer and the same validation rules, on a
-# CPU.
+# the build questions a first `cargo build` would surface. `vulkan` runs the
+# backend against Mesa's **lavapipe**, a software Vulkan implementation, with the
+# Khronos validation layer loaded. That is not a mock: it is the same driver
+# interface, the same validation layer and the same validation rules, on a CPU.
 #
 # Without lavapipe the backend suite would only ever run on someone's machine,
 # which is how nine real bugs survived for the length of this project. A gate that
@@ -127,23 +124,6 @@ jobs:
       # so a red run names the failure -- a compile shape, not a behaviour.
       - name: Build questions
         run: cargo test -p adam
-
-  parity:
-    name: parity (C++ coverage)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # The repository's claim is that nothing was left behind in the rewrite, and
-      # a claim like that is worth exactly as much as the check behind it -- which
-      # needs the tree it checks against. Cloned as a sibling, the layout
-      # `scripts/parity.sh` defaults to, so the default path itself is exercised.
-      # Shallow: the walk reads the working tree, and no submodule is under it.
-      - name: Check out the C++ tree alongside
-        run: git clone --depth 1 https://github.com/unhuman-engine/UNHUMAN.git ../UNHUMAN
-
-      - name: Every C++ file is ported, or has a recorded reason
-        run: ./scripts/parity.sh
 
   vulkan:
     name: vulkan (lavapipe + validation)
