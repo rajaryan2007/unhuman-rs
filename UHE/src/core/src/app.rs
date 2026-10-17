@@ -40,6 +40,17 @@ impl App {
         self.plugins.iter().map(|p| p.name()).collect()
     }
 
+    /// A registered plugin, downcast to its concrete type.
+    ///
+    /// `None` when no plugin of that type is registered. This is how a caller
+    /// reads a plugin's own output: the editor pulls the renderer's last frame
+    /// through it, without `adam` naming a renderer.
+    pub fn plugin_mut<T: Plugin>(&mut self) -> Option<&mut T> {
+        self.plugins
+            .iter_mut()
+            .find_map(|plugin| (plugin.as_mut() as &mut dyn std::any::Any).downcast_mut::<T>())
+    }
+
     pub fn engine(&self) -> &Engine {
         &self.engine
     }

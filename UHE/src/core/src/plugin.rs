@@ -32,7 +32,11 @@ impl FrameCtx {
 ///
 /// The registry lives on `App`, beside `Engine`, never inside it: iterating
 /// plugins and borrowing the engine must stay disjoint.
-pub trait Plugin: Send + 'static {
+///
+/// `Any` is a supertrait so `App::plugin_mut` can downcast a `dyn Plugin` back
+/// to its concrete type -- the editor reads the renderer's frame that way. It
+/// adds nothing to implement: every `'static` type is already `Any`.
+pub trait Plugin: Send + std::any::Any {
     /// Plugin identifier, for `--list-plugins` and the boot log.
     ///
     /// A method rather than `const NAME`: an associated const would make the
