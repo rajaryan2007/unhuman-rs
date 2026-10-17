@@ -25,4 +25,4 @@ pub mod text;
 
 pub use camera::EditorCamera;
 pub use plugin::BifrostPlugin;
-pub use renderer::{Bifrost, ViewSource};
+pub use renderer::{Bifrost, FrameImage, ViewSource};

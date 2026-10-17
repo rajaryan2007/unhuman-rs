@@ -9,6 +9,7 @@ pub mod geometry;
 pub mod lines;
 pub mod overlay;
 pub mod pipeline;
+pub mod readback;
 pub mod shadow;
 pub mod ssao;
 pub mod uniforms;
@@ -24,6 +25,7 @@ pub use geometry::{GeometryPass, MaterialPipelines, PreparedDraw};
 pub use lines::{GridPass, GridUniforms, LineBatch, LinePass, LineUniforms, LineVertex};
 pub use overlay::{SpriteTextOverlay, PASS_2D, PASS_TEXT};
 pub use pipeline::{PipelineCache, PipelineKey, ShaderSet, ShaderVariant};
+pub use readback::ReadbackPass;
 pub use shadow::ShadowPass;
 pub use ssao::{SsaoPass, SsaoUniforms};
 pub use uniforms::{BindSet, DrawArena, DrawUniforms, FrameUniforms, ImageSet, ShadowUniforms};
@@ -38,6 +40,9 @@ pub const PASS_SSAO: &str = "ssao";
 /// The grid and the gizmos, in one pass.
 pub const PASS_EDITOR: &str = "editor";
 pub const PASS_COMPOSITE: &str = "composite";
+/// The composed image copied out for the CPU. Headless only; there is nothing to
+/// read back when the frame is presented to a surface.
+pub const PASS_READBACK: &str = "readback";
 
 /// The graph slots this frame's passes are attached to.
 ///
@@ -78,6 +83,7 @@ pub struct FrameRecorder {
     pub ssao: Option<SsaoPass>,
     pub editor: Option<EditorPass>,
     pub composite: Option<CompositePass>,
+    pub readback: Option<ReadbackPass>,
     pub overlay: Option<Arc<dyn OverlayPasses>>,
 }
 
@@ -90,6 +96,7 @@ impl FrameRecorder {
             ssao: None,
             editor: None,
             composite: None,
+            readback: None,
             overlay: None,
         }
     }
@@ -133,6 +140,10 @@ impl PassRecorder for FrameRecorder {
             PASS_COMPOSITE => match &self.composite {
                 Some(pass) => pass.record(scope, list),
                 None => Err(missing(PASS_COMPOSITE)),
+            },
+            PASS_READBACK => match &self.readback {
+                Some(pass) => pass.record(scope, list),
+                None => Err(missing(PASS_READBACK)),
             },
             other => match &self.overlay {
                 Some(overlay) => overlay.record(other, scope, list),

@@ -16,9 +16,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chassis::graph::{CompiledGraph, ImageState, PassRecorder, RenderGraph, SlotTable};
+use chassis::graph::{
+    BufferId, CompiledGraph, ImageState, PassRecorder, PassType, RenderGraph, SlotTable,
+};
 use chassis::{
-    BindGroup, BufferDesc, BufferUsage, Error, Extent, Extent2d, Gpu, ImageView, Resources,
+    BindGroup, Buffer, BufferDesc, BufferUsage, Error, Extent, Extent2d, Gpu, ImageView, Resources,
     Sampler, SamplerDesc, Texture, TextureDesc, TextureFormat, TextureUsage,
 };
 use glam::{Mat4, Vec3};
@@ -33,8 +35,8 @@ use crate::mesh::{self, GpuMesh, MeshCache, MeshKey, VertexLayoutKey};
 use crate::passes::{
     self, uniforms, CompositePass, DrawArena, EditorPass, FrameRecorder, FrameTargets,
     GeometryPass, GridPass, GridUniforms, ImageSet, LineBatch, LinePass, LineUniforms,
-    MaterialPipelines, OverlayPasses, PipelineCache, PipelineKey, PreparedDraw, ShaderSet,
-    ShaderVariant, ShadowPass, SsaoPass, SsaoUniforms,
+    MaterialPipelines, OverlayPasses, PipelineCache, PipelineKey, PreparedDraw, ReadbackPass,
+    ShaderSet, ShaderVariant, ShadowPass, SsaoPass, SsaoUniforms,
 };
 
 /// Where the frame's camera comes from.
@@ -56,6 +58,19 @@ pub const SHADOW_EXTENT: f32 = 40.0;
 
 /// The clear colour, taken from the editor theme.
 pub const CLEAR_COLOR: [f32; 4] = [0.1, 0.1, 0.12, 1.0];
+
+/// One composed frame the renderer copied back to the CPU.
+///
+/// Only produced headless: a caller with a surface already has the frame on
+/// screen, and a swapchain image is not the renderer's to copy.
+#[derive(Clone, Debug)]
+pub struct FrameImage {
+    pub width: u32,
+    pub height: u32,
+    /// The composition target's bytes, tightly packed. `Bgra8Srgb` unless a
+    /// surface said otherwise, so red and blue are swapped relative to RGBA.
+    pub bgra: Vec<u8>,
+}
 
 /// The frame's own textures, recreated when the extent changes.
 struct FrameTextures {
@@ -131,10 +146,13 @@ impl FrameTextures {
         ))?;
         let ssao_view = resources.create_image_view(&ssao)?;
 
+        // `TRANSFER_SRC` only matters headless: the readback pass copies this
+        // image into a buffer for the CPU, and the graph's barrier for that
+        // copy needs the usage declared.
         let offscreen = resources.create_texture(TextureDesc::new_2d(
             Extent::new(width, height),
             composite_format,
-            TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED,
+            TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLED | TextureUsage::TRANSFER_SRC,
         ))?;
 
         let sampler = resources.create_sampler(&SamplerDesc::clamped())?;
@@ -201,6 +219,14 @@ pub struct Bifrost {
 
     overlay: Option<Arc<dyn OverlayPasses>>,
     frame_index: u64,
+    /// The buffer the composed frame is copied into and read back from. `None`
+    /// with a surface -- there is nothing to read back -- or when the device
+    /// cannot make a readable buffer.
+    readback: Option<Buffer>,
+    /// The last frame read back, or `None` before the first one.
+    frame_image: Option<FrameImage>,
+    /// Readback failures are logged once, not once per frame.
+    readback_warned: bool,
 }
 
 impl Bifrost {
@@ -254,11 +280,15 @@ impl Bifrost {
             show_grid: true,
             overlay: None,
             frame_index: 0,
+            readback: None,
+            frame_image: None,
+            readback_warned: false,
         };
 
         // The 1x1 textures a material with no map of a kind samples, made once.
         bifrost.textures_by_asset.white(gpu.resources())?;
         bifrost.textures_by_asset.neutral_normal(gpu.resources())?;
+        bifrost.recreate_readback(gpu.resources(), extent);
 
         Ok(bifrost)
     }
@@ -286,6 +316,48 @@ impl Bifrost {
 
     pub fn extent(&self) -> Extent2d {
         self.extent
+    }
+
+    /// The last composed frame read back for the CPU.
+    ///
+    /// `None` before the first frame, with a surface (the frame is presented
+    /// instead), or when the device refused a readable buffer.
+    pub fn frame_image(&self) -> Option<&FrameImage> {
+        self.frame_image.as_ref()
+    }
+
+    /// Recreates the readback buffer for `extent`, or drops it when there is a
+    /// surface to present to instead.
+    fn recreate_readback(&mut self, resources: &mut dyn Resources, extent: Extent2d) {
+        if let Some(old) = self.readback.take() {
+            resources.destroy_buffer(old);
+        }
+        self.frame_image = None;
+        if self.has_surface {
+            return;
+        }
+
+        // `MAP_READ` is what wgpu needs to map it; Vulkan ignores the flag and
+        // makes the buffer host-visible because it is a transfer destination.
+        // `TRANSFER_DST` is both.
+        let size = u64::from(extent.width.max(1)) * u64::from(extent.height.max(1)) * 4;
+        match resources.create_buffer(
+            BufferDesc::new(size, BufferUsage::TRANSFER_DST | BufferUsage::MAP_READ),
+            None,
+        ) {
+            Ok(buffer) => self.readback = Some(buffer),
+            Err(error) => {
+                // Once, not once per frame: no readable buffer is a property of
+                // the device, and repeating it buries the first line.
+                if !self.readback_warned {
+                    log::warn!(
+                        "bifrost: no readback buffer ({error}); the editor frame stays on the GPU"
+                    );
+                    self.readback_warned = true;
+                }
+                self.readback = None;
+            }
+        }
     }
 
     pub fn meshes(&self) -> &MeshCache {
@@ -454,6 +526,7 @@ impl Bifrost {
                 FrameTextures::create(resources, extent, SHADOW_MAP_SIZE, self.swapchain_format)?;
             let old = std::mem::replace(&mut self.textures, textures);
             old.destroy(resources);
+            self.recreate_readback(resources, extent);
             self.extent = extent;
         }
         if let Some(format) = gpu.swapchain().map(|swapchain| swapchain.format()) {
@@ -465,7 +538,7 @@ impl Bifrost {
         let shadow_matrix = shadow_view_projection(&light_data, camera_position);
 
         // declare the frame
-        let targets = self.declare_frame();
+        let (targets, readback_slot) = self.declare_frame();
         self.targets = Some(targets);
 
         let compiled = self
@@ -486,6 +559,11 @@ impl Bifrost {
         // target here.
         if !self.has_surface {
             slots.set_texture(targets.backbuffer, self.textures.offscreen);
+        }
+        // The readback pass writes this buffer; the graph named it, the slot
+        // table turns the name into the handle.
+        if let (Some(buffer), Some(slot)) = (self.readback, readback_slot) {
+            slots.set_buffer(slot, buffer);
         }
 
         let (light_buffer, light_count) = self.lights.ensure(resources, &light_data)?;
@@ -522,11 +600,54 @@ impl Bifrost {
         let recorder: Arc<dyn PassRecorder> = recorder;
         gpu.record_frame(&compiled, &slots, recorder)?;
 
+        // `record_frame` submitted and waited, so the copy into the readback
+        // buffer has retired and it is safe to map.
+        self.capture_readback(gpu);
+
         Ok(())
     }
 
+    /// Reads this frame's composition back into `frame_image`.
+    ///
+    /// Does nothing without a readback buffer: a surface already has the frame.
+    fn capture_readback(&mut self, gpu: &mut dyn Gpu) {
+        let Some(buffer) = self.readback else {
+            return;
+        };
+        let extent = self.extent;
+        let expected = extent.width as usize * extent.height as usize * 4;
+
+        match gpu.resources().read_buffer(&buffer) {
+            Ok(bgra) if bgra.len() >= expected => {
+                self.frame_image = Some(FrameImage {
+                    width: extent.width,
+                    height: extent.height,
+                    bgra,
+                });
+            }
+            Ok(bgra) => {
+                if !self.readback_warned {
+                    log::warn!(
+                        "bifrost: readback returned {} bytes for a {}x{} frame",
+                        bgra.len(),
+                        extent.width,
+                        extent.height
+                    );
+                    self.readback_warned = true;
+                }
+            }
+            Err(error) => {
+                if !self.readback_warned {
+                    log::warn!("bifrost: readback failed ({error}); the frame stays on the GPU");
+                    self.readback_warned = true;
+                }
+            }
+        }
+    }
+
     /// Declares this frame's resources and passes.
-    fn declare_frame(&mut self) -> FrameTargets {
+    fn declare_frame(&mut self) -> (FrameTargets, Option<BufferId>) {
+        let readback_enabled = self.readback.is_some();
         let graph = &mut self.graph;
         graph.reset();
 
@@ -601,7 +722,21 @@ impl Bifrost {
             .read_texture(scene_color)
             .read_texture(ssao);
 
-        targets
+        // Copy the composed image out for the CPU, when there is no surface to
+        // present it to. Declared after the composition so it reads the final
+        // image, and as a transfer pass so the graph emits the image-to-buffer
+        // barrier that `vkCmdCopyImageToBuffer` needs.
+        let readback = readback_enabled.then(|| {
+            let buffer = graph.import_buffer("readback");
+            graph
+                .pass(passes::PASS_READBACK)
+                .kind(PassType::Transfer)
+                .read_texture(backbuffer)
+                .write_buffer(buffer);
+            buffer
+        });
+
+        (targets, readback)
     }
 
     /// Turns the scene's meshes into draws, and uploads their uniforms.
@@ -888,6 +1023,15 @@ impl Bifrost {
             recorder.composite = Some(CompositePass::new(pipeline, group));
         }
 
+        if compiled.find(passes::PASS_READBACK).is_some() {
+            if let Some(target) = self.readback {
+                recorder.readback = Some(ReadbackPass {
+                    source: self.textures.offscreen,
+                    target,
+                });
+            }
+        }
+
         recorder.overlay = self.overlay.clone();
         Ok(Arc::new(recorder))
     }
@@ -910,6 +1054,9 @@ impl Bifrost {
         if let Some(batch) = self.line_batch.take() {
             resources.destroy_buffer(batch.vertex);
             resources.destroy_buffer(batch.index);
+        }
+        if let Some(buffer) = self.readback.take() {
+            resources.destroy_buffer(buffer);
         }
         self.shaders.destroy(resources);
         let textures = std::mem::replace(&mut self.textures, FrameTextures::null());

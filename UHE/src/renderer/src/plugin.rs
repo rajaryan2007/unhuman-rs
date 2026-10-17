@@ -67,6 +67,12 @@ impl BifrostPlugin {
     pub fn renderer_mut(&mut self) -> Option<&mut Bifrost> {
         self.renderer.as_mut()
     }
+
+    /// The last frame the renderer read back to the CPU, or `None` before the
+    /// first frame or with a surface.
+    pub fn frame_image(&self) -> Option<&crate::renderer::FrameImage> {
+        self.renderer.as_ref().and_then(Bifrost::frame_image)
+    }
 }
 
 impl Default for BifrostPlugin {
