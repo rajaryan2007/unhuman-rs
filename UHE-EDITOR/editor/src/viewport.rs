@@ -1,22 +1,35 @@
 //! The center viewport.
 //!
-//! The editor window belongs to gpui, so the engine is built headless
+//! The editor window belongs to gpui and the engine runs headless
 //! (`engine::create_gpu_from_process` hands back `WgpuGpu::headless`, and
-//! `chassis::Gpu::swapchain()` is `None` by design). The renderer records its
-//! frame through `chassis::Gpu::record_frame`, but the RHI has no readback:
-//! `chassis::Resources` never hands pixels to the CPU, so the image the engine
-//! drew cannot reach this panel.
-//!
-//! So the viewport draws the theme background and says what is missing. A stored
-//! RGBA buffer here would be a claim about pixels nothing can hand over.
-//!
-//! What would change it: an `Image`/readback in `chassis`, or gpui owning the
-//! surface the frame is presented to. Then this file gains the frame (extent plus
-//! RGBA8) and `panels::viewport` draws it instead of the text.
+//! `chassis::Gpu::swapchain()` is `None` by design). The frame cannot be
+//! presented by the engine, so it is read back: `bifrost` copies the composed
+//! image into a readable buffer each frame and hands over a
+//! [`bifrost::FrameImage`], and this module turns that into the gpui image the
+//! panel draws.
 
-/// Shown in the middle of the viewport, in place of an image.
+use std::sync::Arc;
+
+use bifrost::FrameImage;
+use gpui::RenderImage;
+use image::{Frame, ImageBuffer, Rgba};
+use smallvec::SmallVec;
+
+/// Shown in the middle of the viewport until the first frame is read back.
 pub const MISSING_FRAME_REASON: &str =
-    "no engine image: chassis has no readback from the RHI to the UI";
+    "no engine image yet: the renderer has not read a frame back";
+
+/// A readback frame as a gpui image.
+///
+/// gpui's `RenderImage` is BGRA, which is the composition target's format, so
+/// the bytes go in unswizzled. The buffer is already tightly packed
+/// (`width * height * 4`), which is what `from_raw` needs.
+pub fn render_image(frame: &FrameImage) -> Arc<RenderImage> {
+    let buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
+        ImageBuffer::from_raw(frame.width, frame.height, frame.bgra.clone())
+            .expect("a readback frame is width * height * 4 bytes");
+    Arc::new(RenderImage::new(SmallVec::from_const([Frame::new(buffer)])))
+}
 
 /// The renderer's name, or why there is none.
 pub fn backend_label(backend: Option<&str>) -> &str {
@@ -73,5 +86,27 @@ mod tests {
     #[test]
     fn the_missing_frame_reason_names_a_cause() {
         assert!(MISSING_FRAME_REASON.contains("no engine image"));
+    }
+
+    #[test]
+    fn a_frame_becomes_an_image_of_its_size() {
+        let frame = FrameImage {
+            width: 2,
+            height: 3,
+            bgra: vec![0; 2 * 3 * 4],
+        };
+        let image = render_image(&frame);
+        assert_eq!(image.as_bytes(0).map(<[u8]>::len), Some(2 * 3 * 4));
+    }
+
+    #[test]
+    #[should_panic(expected = "width * height * 4")]
+    fn a_frame_that_is_not_its_size_panics() {
+        let frame = FrameImage {
+            width: 2,
+            height: 2,
+            bgra: vec![0; 4],
+        };
+        let _ = render_image(&frame);
     }
 }

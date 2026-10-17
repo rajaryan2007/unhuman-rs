@@ -9,14 +9,16 @@
 //! `mirror::Editor` are fields of one struct, and `Engine`'s data is never
 //! borrowed by two of them at once.
 //!
-//! The engine is built headless, because the window is gpui's. See
-//! `crate::viewport` for what that leaves the viewport showing.
+//! The engine is built headless, because the window is gpui's. Each frame the
+//! renderer reads its composed image back and this view turns it into a gpui
+//! image for the viewport; see `crate::viewport`.
 
 use std::ffi::CStr;
+use std::sync::Arc;
 
 use gpui::{
     canvas, div, prelude::*, px, Context, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, Render, Window,
+    MouseUpEvent, Render, RenderImage, Window,
 };
 use mirror::gizmo::GizmoMode;
 use mirror::play_state::PlayStatus;
@@ -46,6 +48,8 @@ pub struct EditorApp {
     theme_source: mirror::theme::Theme,
     backend: Option<String>,
     layout: Layout,
+    /// The renderer's last readback frame, as a gpui image the viewport draws.
+    frame: Option<Arc<RenderImage>>,
 }
 
 impl EditorApp {
@@ -88,6 +92,7 @@ impl EditorApp {
             theme_source,
             backend,
             layout: Layout::default(),
+            frame: None,
         }
     }
 
@@ -121,9 +126,27 @@ impl EditorApp {
             log::error!("engine frame failed: {error}");
         }
 
+        self.capture_frame();
+
         if self.editor.theme != self.theme_source {
             self.theme_source = self.editor.theme;
             self.theme = EditorTheme::from(&self.theme_source);
+        }
+    }
+
+    /// Turns the renderer's last readback frame into a gpui image.
+    ///
+    /// A no-op when the frame was not read back: the previous image is kept so
+    /// a device that cannot read back shows the reason once rather than
+    /// flickering.
+    fn capture_frame(&mut self) {
+        let frame = self
+            .engine
+            .plugin_mut::<bifrost::BifrostPlugin>()
+            .and_then(|plugin| plugin.frame_image())
+            .map(viewport::render_image);
+        if frame.is_some() {
+            self.frame = frame;
         }
     }
 
@@ -361,7 +384,7 @@ impl Render for EditorApp {
                             .flex_1()
                             .min_w_0()
                             .h_full()
-                            .child(panels::viewport::panel(&theme)),
+                            .child(panels::viewport::panel(&theme, self.frame.as_ref())),
                     )
                     .child(self.splitter(Splitter::Inspector, cx))
                     .child(

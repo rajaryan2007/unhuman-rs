@@ -15,6 +15,10 @@ bifrost = { workspace = true }
 mirror = { workspace = true }
 chassis = { workspace = true }
 log = { workspace = true }
+# The viewport turns a readback frame into a gpui image: `RenderImage` is built
+# from an `image::Frame`, so the editor names the same `image` crate gpui does.
+image = { workspace = true }
+smallvec = "1"
 
 [dependencies.gpui]
 git = "https://github.com/zed-industries/zed"
