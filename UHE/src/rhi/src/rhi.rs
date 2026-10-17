@@ -196,6 +196,20 @@ pub trait Resources {
         width: u32,
         height: u32,
     ) -> Result<()>;
+
+    /// The whole buffer's contents, on the CPU.
+    ///
+    /// The buffer must be readable: created with [`crate::BufferUsage::MAP_READ`]
+    /// on wgpu, and in host-visible memory on Vulkan. That is what makes a
+    /// rendered image reachable: a pass copies a texture into a readable buffer
+    /// with [`CommandList::copy_texture_to_buffer`], and this hands the pixels
+    /// back.
+    ///
+    /// Blocks until the memory can be mapped, so a caller must have waited for
+    /// the work that wrote it -- a copy is not visible to the CPU until the
+    /// queue has retired it. `readback` here is not a hot path.
+    fn read_buffer(&mut self, buffer: &Buffer) -> Result<Vec<u8>>;
+
     fn destroy_pipeline(&mut self, pipeline: Pipeline);
     fn destroy_shader(&mut self, shader: Shader);
     fn destroy_bind_group(&mut self, group: BindGroup);

@@ -45,6 +45,10 @@ pub use crate::wgpu_pipeline::PipelineResource;
 pub struct BufferResource {
     inner: wgpu::Buffer,
     size: u64,
+    /// The RHI usage it was created with. wgpu can be asked, but only through
+    /// `wgpu::Buffer::usage`, and a readback has to refuse a buffer the caller
+    /// never made readable before wgpu turns that into a validation panic.
+    usage: chassis::BufferUsage,
     label: String,
 }
 
@@ -55,6 +59,10 @@ impl BufferResource {
 
     pub fn size(&self) -> u64 {
         self.size
+    }
+
+    pub fn usage(&self) -> chassis::BufferUsage {
+        self.usage
     }
 
     pub fn label(&self) -> &str {
@@ -390,6 +398,7 @@ impl chassis::Resources for WgpuResources {
         Ok(self.buffers.create(BufferResource {
             inner,
             size: desc.size,
+            usage: desc.usage,
             label,
         }))
     }
@@ -718,6 +727,39 @@ impl chassis::Resources for WgpuResources {
             },
         );
         Ok(())
+    }
+
+    fn read_buffer(&mut self, buffer: &chassis::Buffer) -> chassis::Result<Vec<u8>> {
+        let resource = self
+            .buffers
+            .get(*buffer)
+            .ok_or(chassis::Error::InvalidHandle)?;
+        // Refused here rather than left to wgpu, which validates the map against
+        // the creation usage and reports it through an error scope -- a panic
+        // when none is installed, and an unactionable one at that.
+        if !resource.usage().contains(chassis::BufferUsage::MAP_READ) {
+            return Err(chassis::Error::Unsupported(
+                "read_buffer needs a buffer created with BufferUsage::MAP_READ".to_owned(),
+            ));
+        }
+
+        let slice = resource.inner().slice(..);
+        // `map_async`'s callback runs from `poll`, so the poll is not optional:
+        // without it the callback never fires and the range is not mapped.
+        slice.map_async(wgpu::MapMode::Read, |_| {});
+
+        self.device
+            .inner()
+            .poll(wgpu::PollType::wait_indefinitely())
+            .map_err(|_| chassis::Error::DeviceLost)?;
+
+        let view = slice.get_mapped_range().map_err(|error| {
+            chassis::Error::Unsupported(format!("buffer not mappable: {error}"))
+        })?;
+        let bytes = view.to_vec();
+        drop(view);
+        resource.inner().unmap();
+        Ok(bytes)
     }
 
     fn destroy_texture(&mut self, texture: chassis::Texture) {

@@ -794,6 +794,17 @@ impl chassis::Resources for VulkanResources {
         result
     }
 
+    fn read_buffer(&mut self, buffer: &chassis::Buffer) -> chassis::Result<Vec<u8>> {
+        // Vulkan has no per-buffer readable flag: readability is the memory
+        // type, and `BufferResource::read` refuses memory that is not
+        // host-visible. The caller must have waited; `read` maps memory that
+        // the queue may still be writing otherwise.
+        let device = self.device.clone();
+        let buffers = self.buffers();
+        let resource = buffers.get(*buffer).ok_or(chassis::Error::InvalidHandle)?;
+        resource.read(&device).map_err(chassis::Error::from)
+    }
+
     fn destroy_texture(&mut self, texture: chassis::Texture) {
         let device = self.device.clone();
         self.textures_mut().destroy(&device, texture);

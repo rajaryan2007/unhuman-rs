@@ -201,34 +201,11 @@ fn a_triangle_drawn_through_the_command_list_reaches_the_image() {
         .poll(wgpu::PollType::wait_indefinitely())
         .expect("the queue drains");
 
-    // Read back.
-    let pixels = {
-        let resource = resources.get_buffer(readback).expect("readback handle");
-        // `map_async` takes a callback that wgpu invokes from `poll`, which is
-        // why the poll below is not optional: without it the callback never
-        // runs and `get_mapped_range` fails.
-        resource
-            .inner()
-            .slice(..)
-            .map_async(wgpu::MapMode::Read, |_result| {});
-        device
-            .inner()
-            .poll(wgpu::PollType::wait_indefinitely())
-            .expect("the map completes");
-        // A `Result` in wgpu 30, and treated as one: an unmapped range here
-        // means the copy never ran, and `.unwrap_or_default` would produce an
-        // all-zero image -- which then looks exactly like a triangle that did
-        // not draw.
-        let view = resource
-            .inner()
-            .slice(..)
-            .get_mapped_range()
-            .expect("the buffer is mapped after poll");
-        let bytes = view.to_vec();
-        drop(view);
-        resource.inner().unmap();
-        bytes
-    };
+    // Read back. `read_buffer` maps, copies and unmaps: the same wgpu steps the
+    // long comment above describes, in one call the renderer also uses.
+    let pixels = resources
+        .read_buffer(&readback)
+        .expect("the readback buffer maps after the queue drains");
 
     let lit = lit(&pixels);
     assert!(

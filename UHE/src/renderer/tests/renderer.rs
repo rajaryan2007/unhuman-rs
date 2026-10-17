@@ -140,6 +140,10 @@ impl Resources for FakeResources {
         Ok(())
     }
 
+    fn read_buffer(&mut self, _buffer: &Buffer) -> chassis::Result<Vec<u8>> {
+        Ok(Vec::new())
+    }
+
     fn destroy_pipeline(&mut self, pipeline: Pipeline) {
         let _ = self.pipelines.remove(pipeline);
     }
